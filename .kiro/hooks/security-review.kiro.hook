@@ -1,0 +1,13 @@
+{
+  "name": "Security Review",
+  "version": "1.0.0",
+  "description": "Review changes for secure code, secure AWS setup, least-privilege IAM, and secure CI/CD pipelines",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": ["write"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Before writing this file, review the change for security issues across four areas. SECURE CODE: (1) secrets, credentials, or access keys committed in code, config, or tests, (2) unsafe logging of sensitive data such as bucket names, object keys, auth headers, or tokens, (3) unvalidated input used to build S3 keys or paths — guard against path traversal / arbitrary object access via the file-name parameter, (4) missing input validation on the requested file name. SECURE AWS SETUP: (5) S3 buckets without encryption, with public access, or without Block Public Access, (6) missing or infinite CloudWatch log retention, (7) missing TLS/HTTPS enforcement. LEAST-PRIVILEGE IAM: (8) overly broad IAM permissions in SAM templates (wildcards on actions or resources) — scope to the specific bucket/prefix and only the actions needed (e.g. s3:GetObject), (9) Lambda execution role broader than required. SECURE PIPELINE: (10) long-lived AWS credentials in CI instead of short-lived OIDC role assumption, secrets printed in pipeline logs, or unpinned third-party actions. Note: this project handles NO PII and uses NO AI/Bedrock — do not flag PII-model or AI-credit concerns. If any issues are found, describe them clearly. If no issues, confirm the change is safe."
+  }
+}
