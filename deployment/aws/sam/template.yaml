@@ -1,0 +1,158 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  S3 file streaming endpoint - a Kotlin/JVM Lambda behind API Gateway REST proxy
+  integration that streams a large (~15 MB) S3 object to the client via response
+  streaming (RESPONSE_STREAM), without buffering the whole object in memory.
+  Cold-start optimized with SnapStart + tiered compilation on arm64/Java 25.
+
+Parameters:
+  MemorySizeMb:
+    Type: Number
+    Default: 512
+    MinValue: 128
+    MaxValue: 1024
+    Description: Lambda memory size in MB (bounded 128-1024).
+  TimeoutSeconds:
+    Type: Number
+    Default: 300
+    MinValue: 1
+    MaxValue: 300
+    Description: Lambda timeout in seconds (bounded 1-300, within the API Gateway 300s regional idle timeout).
+  LogRetentionDays:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    MaxValue: 30
+    Description: CloudWatch log retention in days (finite, 1-30, never never-expire).
+  ObjectExpirationDays:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    MaxValue: 30
+    Description: Days after which current test objects expire (finite, 1-30).
+  NoncurrentVersionExpirationDays:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    MaxValue: 30
+    Description: Days after which non-current object versions expire (finite, 1-30).
+
+# Runtime and architecture are set once here and inherited by every function.
+# Do NOT override Runtime or Architectures per function (Req 7.4).
+Globals:
+  Function:
+    Runtime: java25
+    Architectures:
+      - arm64
+
+Resources:
+  # ---------------------------------------------------------------------------
+  # REST API with proxy integration. Response streaming is enabled per-route via
+  # the function's Api event property ResponseTransferMode: RESPONSE_STREAM.
+  # ---------------------------------------------------------------------------
+  StreamingApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      EndpointConfiguration:
+        Type: REGIONAL
+
+  # ---------------------------------------------------------------------------
+  # The streaming Lambda. RequestStreamHandler that writes the API Gateway
+  # streaming protocol (metadata JSON + 8 null bytes + body) by hand.
+  # ---------------------------------------------------------------------------
+  StreamingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: s3-file-streaming-endpoint
+      Handler: com.example.streaming.StreamHandler
+      CodeUri: ../../../build/libs/
+      MemorySize: !Ref MemorySizeMb
+      Timeout: !Ref TimeoutSeconds
+      # Cold-start optimization: SnapStart with an auto-published 'live' alias
+      # so every published version produces a snapshot resolvable via 'live'.
+      AutoPublishAlias: live
+      SnapStart:
+        ApplyOn: PublishedVersions
+      Environment:
+        Variables:
+          # Tiered compilation stop-at level 1 for faster restore-time warmup.
+          JAVA_TOOL_OPTIONS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1"
+          # Source bucket passed by name; never hard-coded, never logged.
+          BUCKET_NAME: !Ref SourceBucket
+      # Least privilege: only s3:GetObject, only on this bucket's objects.
+      # No wildcard resource, no other S3 action.
+      Policies:
+        - Statement:
+            - Sid: GetObjectFromSourceBucketOnly
+              Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub "${SourceBucket.Arn}/*"
+      Events:
+        StreamGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref StreamingApi
+            Path: /{proxy+}
+            Method: get
+            # MUST be exactly RESPONSE_STREAM (SAM). The lower-level integration
+            # value STREAM is NOT interchangeable - see docs/log.md.
+            ResponseTransferMode: RESPONSE_STREAM
+    # No ProvisionedConcurrencyConfig anywhere - no always-on capacity (Req 11.3).
+
+  # ---------------------------------------------------------------------------
+  # CloudWatch log group with a finite 30-day retention. The name matches the
+  # alias-published function so SnapStart invocations log here too.
+  # ---------------------------------------------------------------------------
+  StreamingFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${StreamingFunction}"
+      RetentionInDays: !Ref LogRetentionDays
+
+  # ---------------------------------------------------------------------------
+  # Private, encrypted S3 source bucket with bounded, finite-cost lifecycle.
+  # ---------------------------------------------------------------------------
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      # Default server-side encryption so every object is encrypted at rest.
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      # All four Block Public Access flags true.
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      # Versioning enabled so non-current versions exist to be expired.
+      VersioningConfiguration:
+        Status: Enabled
+      # Lifecycle rules bound storage cost: expire current objects and
+      # non-current versions within a finite 1-30 day window.
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireCurrentTestObjects
+            Status: Enabled
+            ExpirationInDays: !Ref ObjectExpirationDays
+          - Id: ExpireNoncurrentVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: !Ref NoncurrentVersionExpirationDays
+
+Outputs:
+  StreamingEndpointUrl:
+    Description: Base HTTPS URL of the streaming endpoint (append the requested file name).
+    Value: !Sub "https://${StreamingApi}.execute-api.${AWS::Region}.amazonaws.com/prod/"
+  FunctionName:
+    Description: Name of the streaming Lambda function.
+    Value: !Ref StreamingFunction
+  FunctionLiveAliasArn:
+    Description: ARN of the SnapStart 'live' alias.
+    Value: !Ref StreamingFunction.Alias
+  SourceBucketName:
+    Description: Name of the private, encrypted S3 source bucket.
+    Value: !Ref SourceBucket
