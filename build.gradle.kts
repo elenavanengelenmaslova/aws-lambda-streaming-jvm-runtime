@@ -77,7 +77,8 @@ tasks.test {
 
 // ---- Fat jar for Lambda deployment (Shadow) -------------------------------------------------
 tasks.shadowJar {
-    archiveClassifier.set("all")
+    archiveFileName.set("streaming-endpoint.jar")
+    destinationDirectory.set(file("${rootDir}/build/dist"))
     // Merge SDK/service metadata so AWS SDK service loaders resolve inside the fat jar.
     mergeServiceFiles()
 }

@@ -67,7 +67,7 @@ Resources:
     Properties:
       FunctionName: s3-file-streaming-endpoint
       Handler: com.example.streaming.StreamHandler
-      CodeUri: ../../../build/libs/
+      CodeUri: ../../../build/dist/streaming-endpoint.jar
       MemorySize: !Ref MemorySizeMb
       Timeout: !Ref TimeoutSeconds
       # Cold-start optimization: SnapStart with an auto-published 'live' alias

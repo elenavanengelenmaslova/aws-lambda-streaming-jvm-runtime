@@ -64,10 +64,8 @@ jobs:
       - name: Build Lambda JAR
         run: |
           ./gradlew clean build --no-build-cache
-          # Ensure only the shadow (fat) JAR is in build/libs for SAM CodeUri
-          find build/libs -name "*.jar" ! -name "*-all.jar" -delete
           echo "Build completed, shadow JAR for deployment:"
-          ls -lh build/libs/*-all.jar
+          ls -lh build/dist/streaming-endpoint.jar
 
       - name: Deploy with SAM
         id: sam-deploy
