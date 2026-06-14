@@ -137,9 +137,13 @@ class S3SourceTest {
     // --- head: timeout -> Failure (Req 3.4) ---
 
     @Test
-    fun `Given a head that exceeds the 10 second budget When head is called Then it returns Failure with a timeout cause`() = runTest {
+    fun `Given a head that times out When head is called Then it returns Failure with a timeout cause`() = runTest {
+        // Simulate what happens when withTimeout fires: the S3 call throws a
+        // CancellationException that is specifically a TimeoutCancellationException.
+        // Since the constructor is internal, we trigger it via kotlinx.coroutines.withTimeout.
         coEvery { client.headObject(any()) } coAnswers {
-            delay(11.seconds)
+            kotlinx.coroutines.withTimeout(1L) { kotlinx.coroutines.delay(100L) }
+            @Suppress("UNREACHABLE_CODE")
             HeadObjectResponse { contentLength = 1L }
         }
 

@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Run Tests After Code Changes",
+  "description": "Runs ./gradlew test after the agent finishes modifying source files to catch regressions immediately.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "./gradlew test",
+    "timeout": 300
+  }
+}
