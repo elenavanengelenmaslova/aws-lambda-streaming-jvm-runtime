@@ -39,7 +39,7 @@ class S3Source(
                 bucket = this@S3Source.bucket
                 this.key = key
             }
-            withTimeout(10.seconds) {
+            withTimeout(60.seconds) {
                 client.headObject(request)
             }
         }.fold(

@@ -9,7 +9,7 @@ Description: >-
 Parameters:
   MemorySizeMb:
     Type: Number
-    Default: 512
+    Default: 1024
     MinValue: 128
     MaxValue: 1024
     Description: Lambda memory size in MB (bounded 128-1024).

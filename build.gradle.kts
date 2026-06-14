@@ -39,6 +39,9 @@ dependencies {
     // --- Logging ---
     implementation("io.github.oshai:kotlin-logging-jvm:$kotlinLoggingVersion")
 
+    // SLF4J simple provider so kotlin-logging outputs to CloudWatch (not NOP)
+    implementation("org.slf4j:slf4j-simple:2.0.16")
+
     // --- CRaC priming hook for SnapStart ---
     implementation("org.crac:crac:$cracVersion")
 
