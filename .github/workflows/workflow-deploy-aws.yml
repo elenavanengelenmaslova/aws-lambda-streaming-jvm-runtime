@@ -1,0 +1,142 @@
+name: Reusable - AWS Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        description: 'Deployment environment'
+      aws-region:
+        required: false
+        type: string
+        default: 'eu-west-1'
+        description: 'AWS region for deployment'
+      github-actions-role-name:
+        required: false
+        type: string
+        default: 'StreamingExampleGitHubActionsRole'
+        description: 'Name of the GitHub Actions OIDC role'
+      stack-name:
+        required: false
+        type: string
+        default: ''
+        description: 'CloudFormation stack name override (defaults to value in samconfig.toml)'
+    secrets:
+      AWS_ACCOUNT_ID:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    outputs:
+      endpoint-url: ${{ steps.outputs.outputs.endpoint-url }}
+      bucket-name: ${{ steps.outputs.outputs.bucket-name }}
+      stack-name: ${{ steps.outputs.outputs.stack-name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ inputs.github-actions-role-name }}
+          role-session-name: StreamingExampleDeployment
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Setup SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: Build Lambda JAR
+        run: |
+          ./gradlew clean build --no-build-cache
+          echo "Build completed, checking JAR file:"
+          ls -lh build/libs/*-all.jar
+
+      - name: Deploy with SAM
+        id: sam-deploy
+        run: |
+          cd deployment/aws/sam
+          echo "Starting SAM deployment..."
+
+          STACK_NAME_OVERRIDE="${{ inputs.stack-name }}"
+
+          # SAM deployment artifacts bucket (created by the bootstrap OIDC stack).
+          ARTIFACTS_BUCKET="streaming-sam-artifacts-${{ secrets.AWS_ACCOUNT_ID }}-${{ inputs.aws-region }}"
+
+          # CloudFormation execution role (created by the bootstrap OIDC stack).
+          CFN_EXEC_ROLE_ARN="arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/StreamingCloudFormationExecutionRole"
+
+          EXTRA_ARGS="--s3-bucket $ARTIFACTS_BUCKET --role-arn $CFN_EXEC_ROLE_ARN"
+
+          if [ -n "$STACK_NAME_OVERRIDE" ]; then
+            EXTRA_ARGS="$EXTRA_ARGS --stack-name $STACK_NAME_OVERRIDE"
+          fi
+
+          DEPLOY_OUTPUT=$(sam deploy --config-env default --no-confirm-changeset --force-upload $EXTRA_ARGS 2>&1) && {
+            echo "$DEPLOY_OUTPUT"
+            echo "Deployment completed successfully"
+            echo "deployed=true" >> $GITHUB_OUTPUT
+          } || {
+            EXIT_CODE=$?
+            if echo "$DEPLOY_OUTPUT" | grep -q "No changes to deploy"; then
+              echo "No changes to deploy. Stack is up to date - skipping."
+              echo "deployed=false" >> $GITHUB_OUTPUT
+            else
+              echo "$DEPLOY_OUTPUT"
+              echo "SAM deployment failed with exit code: $EXIT_CODE"
+              exit $EXIT_CODE
+            fi
+          }
+
+      - name: Get deployment outputs
+        id: outputs
+        run: |
+          STACK_NAME_OVERRIDE="${{ inputs.stack-name }}"
+
+          if [ -n "$STACK_NAME_OVERRIDE" ]; then
+            STACK_NAME="$STACK_NAME_OVERRIDE"
+          else
+            STACK_NAME="s3-file-streaming-endpoint"
+          fi
+
+          echo "Resolved stack name: $STACK_NAME"
+
+          ENDPOINT_URL=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].Outputs[?OutputKey==`StreamingEndpointUrl`].OutputValue' --output text)
+          BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].Outputs[?OutputKey==`SourceBucketName`].OutputValue' --output text)
+
+          echo "endpoint-url=$ENDPOINT_URL" >> $GITHUB_OUTPUT
+          echo "bucket-name=$BUCKET_NAME" >> $GITHUB_OUTPUT
+          echo "stack-name=$STACK_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create deployment summary
+        if: steps.sam-deploy.outputs.deployed == 'true'
+        run: |
+          echo "## 🚀 Streaming Example Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Region:** ${{ inputs.aws-region }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Deployment Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Stack Name:** ${{ steps.outputs.outputs.stack-name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Endpoint URL:** ${{ steps.outputs.outputs.endpoint-url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source Bucket:** ${{ steps.outputs.outputs.bucket-name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📚 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Seed the 12 MB test object (the pipeline does this automatically)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Test: \`GET ${{ steps.outputs.outputs.endpoint-url }}streaming-test-12mb.bin\`" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,46 @@
+name: Reusable - Streaming Test
+
+on:
+  workflow_call:
+    inputs:
+      aws-region:
+        required: false
+        type: string
+        default: 'eu-west-1'
+        description: 'AWS region'
+      github-actions-role-name:
+        required: false
+        type: string
+        default: 'StreamingExampleGitHubActionsRole'
+        description: 'Name of the GitHub Actions OIDC role'
+      stack-name:
+        required: false
+        type: string
+        default: ''
+        description: 'CloudFormation stack name override'
+    secrets:
+      AWS_ACCOUNT_ID:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  streaming-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ inputs.github-actions-role-name }}
+          role-session-name: StreamingExampleTest
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Run streaming pipeline tests
+        env:
+          STACK_NAME: ${{ inputs.stack-name || 's3-file-streaming-endpoint' }}
+          AWS_REGION: ${{ inputs.aws-region }}
+        run: ./scripts/pipeline-streaming-test.sh

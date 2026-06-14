@@ -1,0 +1,49 @@
+name: CD - Deploy On Demand
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack-name:
+        description: 'CloudFormation stack name (leave empty to use default from samconfig.toml)'
+        required: false
+        default: ''
+        type: string
+      aws-region:
+        description: 'AWS region for deployment'
+        required: false
+        default: 'eu-west-1'
+        type: string
+      github-actions-role-name:
+        description: 'GitHub Actions OIDC role name (leave empty to use OIDC_ROLE_NAME variable)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/workflow-build.yml
+
+  deploy:
+    needs: test
+    uses: ./.github/workflows/workflow-deploy-aws.yml
+    with:
+      environment: default
+      aws-region: ${{ inputs.aws-region }}
+      github-actions-role-name: ${{ inputs.github-actions-role-name || vars.OIDC_ROLE_NAME }}
+      stack-name: ${{ inputs.stack-name }}
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+
+  streaming-tests:
+    needs: deploy
+    uses: ./.github/workflows/workflow-streaming-test.yml
+    with:
+      aws-region: ${{ inputs.aws-region }}
+      github-actions-role-name: ${{ inputs.github-actions-role-name || vars.OIDC_ROLE_NAME }}
+      stack-name: ${{ inputs.stack-name }}
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
