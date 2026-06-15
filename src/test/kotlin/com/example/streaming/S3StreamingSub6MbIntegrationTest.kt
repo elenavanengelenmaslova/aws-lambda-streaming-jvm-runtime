@@ -124,7 +124,7 @@ class S3StreamingSub6MbIntegrationTest {
         val metadataJson = responseBytes.copyOfRange(0, delimiterStart).decodeToString()
         val metadata = Json.decodeFromString<ResponseMetadata>(metadataJson)
         assertEquals(200, metadata.statusCode)
-        assertEquals(listOf(payload.size.toString()), metadata.headers["Content-Length"])
+        assertEquals(payload.size.toString(), metadata.headers["Content-Length"])
 
         // Segment 3: body bytes after the 8 null-byte delimiter -> byte-identical to the upload.
         val body = responseBytes.copyOfRange(delimiterStart + DELIMITER_LEN, responseBytes.size)
