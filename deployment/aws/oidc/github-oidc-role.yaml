@@ -163,6 +163,13 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/s3-file-streaming-endpoint*'
 
+              # Read API key value for authenticated streaming tests
+              - Effect: Allow
+                Action:
+                  - apigateway:GET
+                Resource:
+                  - !Sub 'arn:aws:apigateway:${AWS::Region}::/apikeys/*'
+
       Tags:
         - Key: Application
           Value: streaming-example

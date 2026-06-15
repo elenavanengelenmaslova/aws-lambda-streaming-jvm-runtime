@@ -21,21 +21,21 @@ Parameters:
     Description: Lambda timeout in seconds (bounded 1-300, within the API Gateway 300s regional idle timeout).
   LogRetentionDays:
     Type: Number
-    Default: 30
+    Default: 3
     MinValue: 1
-    MaxValue: 30
+    MaxValue: 7
     Description: CloudWatch log retention in days (finite, 1-30, never never-expire).
   ObjectExpirationDays:
     Type: Number
-    Default: 7
+    Default: 3
     MinValue: 1
-    MaxValue: 30
+    MaxValue: 7
     Description: Days after which current test objects expire (finite, 1-30).
   NoncurrentVersionExpirationDays:
     Type: Number
-    Default: 7
+    Default: 3
     MinValue: 1
-    MaxValue: 30
+    MaxValue: 7
     Description: Days after which non-current object versions expire (finite, 1-30).
 
 # Runtime and architecture are set once here and inherited by every function.
@@ -57,6 +57,11 @@ Resources:
       StageName: prod
       EndpointConfiguration:
         Type: REGIONAL
+      Auth:
+        ApiKeyRequired: true
+        UsagePlan:
+          CreateUsagePlan: PER_API
+          UsagePlanName: StreamingApiUsagePlan
 
   # ---------------------------------------------------------------------------
   # The streaming Lambda. RequestStreamHandler that writes the API Gateway
@@ -156,3 +161,6 @@ Outputs:
   SourceBucketName:
     Description: Name of the private, encrypted S3 source bucket.
     Value: !Ref SourceBucket
+  ApiKeyId:
+    Description: ID of the API key (use `aws apigateway get-api-key --api-key <id> --include-value` to retrieve the value).
+    Value: !Ref StreamingApiApiKey

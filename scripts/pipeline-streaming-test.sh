@@ -82,7 +82,19 @@ resolve_config() {
   [[ "$ENDPOINT_URL" == https://* ]] \
     || fail "ENDPOINT_URL must be HTTPS: $ENDPOINT_URL"
 
-  info "stack=$STACK_NAME endpoint resolved, bucket resolved"
+  # Resolve API key for authenticated requests
+  if [[ -z "${API_KEY:-}" ]]; then
+    local api_key_id
+    api_key_id=$(stack_output ApiKeyId)
+    if [[ -n "$api_key_id" && "$api_key_id" != "None" ]]; then
+      API_KEY=$(aws apigateway get-api-key \
+        --api-key "$api_key_id" --include-value "${region_args[@]}" \
+        --query 'value' --output text 2>/dev/null || true)
+    fi
+  fi
+  [[ -n "${API_KEY:-}" ]] || fail "could not resolve API_KEY (set API_KEY env var or deploy stack with API key)"
+
+  info "stack=$STACK_NAME endpoint resolved, bucket resolved, API key resolved"
 }
 
 build_url() {
@@ -134,6 +146,7 @@ test_streaming_large_payload() {
   body_file="$WORK_DIR/large.bin"
 
   metrics=$(curl --silent --show-error --max-time 120 \
+    --header "x-api-key: $API_KEY" \
     --output "$body_file" \
     --write-out '%{http_code} %{size_download}' \
     "$url") || fail "endpoint unreachable"
@@ -175,10 +188,11 @@ test_streaming_progressive_delivery() {
   url="$(build_url "$TEST_OBJECT_KEY")"
 
   # Warmup request (discard — avoids cold-start skewing TTFB)
-  curl --silent --max-time 120 --output /dev/null "$url" || true
+  curl --silent --max-time 120 --header "x-api-key: $API_KEY" --output /dev/null "$url" || true
   info "  warmup complete (discarded)"
 
   timing_output=$(curl --silent --show-error --max-time 120 --no-buffer \
+    --header "x-api-key: $API_KEY" \
     --output /dev/null \
     --write-out 'ttfb=%{time_starttransfer}\ntotal=%{time_total}\n' \
     "$url") || fail "endpoint unreachable during timing test"
