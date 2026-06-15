@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.testcontainers.containers.localstack.LocalStackContainer
@@ -42,6 +43,7 @@ import kotlin.random.Random
  * uploaded — proving the protocol writer, bounded-buffer copy, and S3 source work together
  * end to end against a real S3 implementation.
  */
+@Tag("integration")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class S3StreamingSub6MbIntegrationTest {
 

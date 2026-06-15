@@ -71,7 +71,12 @@ kotlin {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        val excludeTags = project.findProperty("excludeTags") as? String
+        if (!excludeTags.isNullOrBlank()) {
+            excludeTags(excludeTags)
+        }
+    }
     // MockK mocks final Kotlin classes via byte-buddy class redefinition. On the Java 25
     // toolchain the bundled byte-buddy must be told to accept the newer class-file version,
     // otherwise instrumentation is silently skipped and mocked calls are never intercepted.

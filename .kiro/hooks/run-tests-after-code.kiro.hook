@@ -8,7 +8,7 @@
   },
   "then": {
     "type": "runCommand",
-    "command": "./gradlew test",
+    "command": "./gradlew test -PexcludeTags=integration",
     "timeout": 300
   }
 }
