@@ -50,7 +50,7 @@ class ResponseWriter(private val json: Json = Json) {
         runCatching {
             val metadata = ResponseMetadata(
                 statusCode = status,
-                headers = mapOf("Content-Type" to listOf("application/json")),
+                headers = mapOf("Content-Type" to "application/json"),
             )
             writeMetadata(output, metadata)
             output.write(json.encodeToString(ErrorBody(message)).toByteArray(Charsets.UTF_8))

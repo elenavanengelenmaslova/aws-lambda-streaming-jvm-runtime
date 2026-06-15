@@ -166,3 +166,45 @@ Each entry uses the form:
   propagate the failure rather than swallowing it. Line coverage rose to
   **91.30% (168/184)** and `koverVerify` passes. The 90% threshold was **not**
   weakened.
+
+---
+
+## Streaming protocol metadata: headers must be `Map<String, String>`, not `Map<String, List<String>>`
+
+- **Symptom / trigger:** Lambda completes successfully (12s, 209 MB, no errors in
+  CloudWatch) but API Gateway returns HTTP 502 `{"message": "Internal server error"}`.
+  The streaming integration is correctly configured (`responseTransferMode: STREAM`,
+  URI suffix `/response-streaming-invocations`), and the Lambda writes the metadata
+  JSON + 8 null-byte delimiter + body to the `OutputStream`. The issue only surfaces
+  against a deployed API Gateway; the LocalStack integration tests pass because
+  LocalStack doesn't enforce the metadata prelude format.
+
+- **Root cause:** The metadata JSON prelude's `headers` field was serialized as
+  `Map<String, List<String>>` (JSON arrays for header values):
+  ```json
+  {"statusCode":200,"headers":{"Content-Type":["application/octet-stream"],"Content-Length":["12582912"]}}
+  ```
+  API Gateway's streaming protocol parser expects `Map<String, String>` (plain string
+  values, not arrays):
+  ```json
+  {"statusCode":200,"headers":{"Content-Type":"application/octet-stream","Content-Length":"12582912"}}
+  ```
+  The array format is syntactically valid JSON but not recognized as a valid streaming
+  metadata prelude by API Gateway, which then returns 502 because it cannot extract the
+  HTTP status code and headers from the Lambda output.
+
+- **Resolution / status:** **Resolved.** Changed `ResponseMetadata.headers` from
+  `Map<String, List<String>>` to `Map<String, String>`. For repeatable headers (e.g.
+  `Set-Cookie`), the API Gateway streaming format provides a separate `cookies` array
+  field — it does not use JSON arrays inside the `headers` map. The proven working format
+  (matching the MockNest implementation) is:
+  ```kotlin
+  @Serializable
+  data class ResponseMetadata(
+      val statusCode: Int,
+      val headers: Map<String, String>,
+  )
+  ```
+  This is the single most consequential gotcha for porting the Node.js streaming helper
+  to the JVM: the metadata prelude format is implicitly documented through the Node.js
+  helper's behavior but never spelled out for other runtimes.

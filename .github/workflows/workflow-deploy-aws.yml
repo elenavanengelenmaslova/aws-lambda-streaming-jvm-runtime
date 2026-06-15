@@ -81,7 +81,7 @@ jobs:
           # CloudFormation execution role (created by the bootstrap OIDC stack).
           CFN_EXEC_ROLE_ARN="arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/StreamingCloudFormationExecutionRole"
 
-          EXTRA_ARGS="--s3-bucket $ARTIFACTS_BUCKET --no-resolve-s3 --role-arn $CFN_EXEC_ROLE_ARN"
+          EXTRA_ARGS="--s3-bucket $ARTIFACTS_BUCKET --no-resolve-s3 --role-arn $CFN_EXEC_ROLE_ARN --parameter-overrides MemorySizeMb=1024"
 
           if [ -n "$STACK_NAME_OVERRIDE" ]; then
             EXTRA_ARGS="$EXTRA_ARGS --stack-name $STACK_NAME_OVERRIDE"

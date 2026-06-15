@@ -23,8 +23,8 @@ private val PRIMED_EVENT_JSON = """{"pathParameters":{"proxy":"$PRIMED_FILE_NAME
 private val PRIMED_METADATA = ResponseMetadata(
     statusCode = 200,
     headers = mapOf(
-        "Content-Type" to listOf("application/octet-stream"),
-        "Content-Length" to listOf("0"),
+        "Content-Type" to "application/octet-stream",
+        "Content-Length" to "0",
     ),
 )
 

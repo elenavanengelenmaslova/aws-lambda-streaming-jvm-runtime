@@ -209,8 +209,8 @@ class StatusCommittedOncePropertyTest {
         val metadata = ResponseMetadata(
             statusCode = 200,
             headers = mapOf(
-                "Content-Type" to listOf("application/octet-stream"),
-                "Content-Length" to listOf(size.toString()),
+                "Content-Type" to "application/octet-stream",
+                "Content-Length" to size.toString(),
             ),
         )
         return Json.encodeToString(metadata).toByteArray(Charsets.UTF_8) + ByteArray(DELIMITER_LEN)

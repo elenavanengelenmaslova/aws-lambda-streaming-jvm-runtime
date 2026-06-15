@@ -43,8 +43,8 @@ class ResponseWriterTest {
         val metadata = ResponseMetadata(
             statusCode = 200,
             headers = mapOf(
-                "Content-Type" to listOf("application/octet-stream"),
-                "Content-Length" to listOf("15728640"),
+                "Content-Type" to "application/octet-stream",
+                "Content-Length" to "15728640",
             ),
         )
         val out = ByteArrayOutputStream()
@@ -76,7 +76,7 @@ class ResponseWriterTest {
     @Test
     fun `Given the prelude has no NUL byte When writeMetadata is called Then the first zero byte is the start of the 8-byte delimiter`() {
         // Given
-        val metadata = ResponseMetadata(200, mapOf("X-Empty" to emptyList()))
+        val metadata = ResponseMetadata(200, mapOf("X-Empty" to ""))
         val out = ByteArrayOutputStream()
 
         // When
@@ -152,7 +152,7 @@ class ResponseWriterTest {
     @Test
     fun `Given the output fails on write When writeMetadata is called Then the failure propagates and the status is never silently committed`() {
         // Given an output that throws on the very first write (Req 4.6).
-        val metadata = ResponseMetadata(200, mapOf("Content-Length" to listOf("0")))
+        val metadata = ResponseMetadata(200, mapOf("Content-Length" to "0"))
 
         // When / Then — the write failure propagates rather than being swallowed.
         assertThrows(IOException::class.java) {

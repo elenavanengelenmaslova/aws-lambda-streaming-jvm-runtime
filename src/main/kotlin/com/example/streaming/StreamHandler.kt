@@ -104,8 +104,8 @@ class StreamHandler(
         val metadata = ResponseMetadata(
             statusCode = 200,
             headers = mapOf(
-                "Content-Type" to listOf(OCTET_STREAM),
-                "Content-Length" to listOf(size.toString()),
+                "Content-Type" to OCTET_STREAM,
+                "Content-Length" to size.toString(),
             ),
         )
         responseWriter.writeMetadata(output, metadata)

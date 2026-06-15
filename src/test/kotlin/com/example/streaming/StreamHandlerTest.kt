@@ -127,8 +127,8 @@ class StreamHandlerTest {
 
         val metadata = metadataSlot.captured
         assertEquals(200, metadata.statusCode)
-        assertEquals(listOf(size.toString()), metadata.headers["Content-Length"])
-        assertEquals(listOf("application/octet-stream"), metadata.headers["Content-Type"])
+        assertEquals(size.toString(), metadata.headers["Content-Length"])
+        assertEquals("application/octet-stream", metadata.headers["Content-Type"])
     }
 
     @Test
