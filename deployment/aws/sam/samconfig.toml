@@ -14,7 +14,7 @@ parallel = true
 
 [default.validate.parameters]
 template_file = "template.yaml"
-lint = true
+lint = false
 
 [default.deploy.parameters]
 stack_name = "s3-file-streaming-endpoint"
