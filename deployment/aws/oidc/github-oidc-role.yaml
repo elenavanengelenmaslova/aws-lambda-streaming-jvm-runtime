@@ -255,6 +255,7 @@ Resources:
                   - logs:DeleteLogGroup
                   - logs:PutRetentionPolicy
                   - logs:DescribeLogGroups
+                  - logs:ListTagsForResource
                   - logs:TagLogGroup
                   - logs:TagResource
                   - logs:UntagResource
