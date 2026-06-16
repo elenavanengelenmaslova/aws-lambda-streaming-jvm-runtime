@@ -94,6 +94,11 @@ resolve_config() {
   fi
   [[ -n "${API_KEY:-}" ]] || fail "could not resolve API_KEY (set API_KEY env var or deploy stack with API key)"
 
+  # Mask the API key in GitHub Actions logs so it is never printed even with debug logging.
+  if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo "::add-mask::${API_KEY}"
+  fi
+
   info "stack=$STACK_NAME endpoint resolved, bucket resolved, API key resolved"
 }
 
@@ -145,7 +150,7 @@ test_streaming_large_payload() {
   url="$(build_url "$TEST_OBJECT_KEY")"
   body_file="$WORK_DIR/large.bin"
 
-  metrics=$(curl --silent --show-error --max-time 120 \
+  metrics=$(curl --silent --show-error --max-time 120 --http1.1 \
     --header "x-api-key: $API_KEY" \
     --output "$body_file" \
     --write-out '%{http_code} %{size_download}' \
@@ -188,10 +193,10 @@ test_streaming_progressive_delivery() {
   url="$(build_url "$TEST_OBJECT_KEY")"
 
   # Warmup request (discard — avoids cold-start skewing TTFB)
-  curl --silent --max-time 120 --header "x-api-key: $API_KEY" --output /dev/null "$url" || true
+  curl --silent --max-time 120 --http1.1 --header "x-api-key: $API_KEY" --output /dev/null "$url" || true
   info "  warmup complete (discarded)"
 
-  timing_output=$(curl --silent --show-error --max-time 120 --no-buffer \
+  timing_output=$(curl --silent --show-error --max-time 120 --http1.1 --no-buffer \
     --header "x-api-key: $API_KEY" \
     --output /dev/null \
     --write-out 'ttfb=%{time_starttransfer}\ntotal=%{time_total}\n' \

@@ -244,3 +244,37 @@ Each entry uses the form:
   prelude on the JVM `RequestStreamHandler` path without any explicit
   `setContentType("application/vnd.awslambda.http-integration-response")` call — the
   streaming invocation path handles it automatically when `ResponseTransferMode` is set.
+
+---
+
+## curl HTTP/2 error 92 with API Gateway response streaming — force `--http1.1`
+
+- **Symptom / trigger:** In CI (GitHub Actions) and on local machines with newer curl
+  versions that default to HTTP/2, streaming requests to the API Gateway endpoint fail
+  with:
+  ```
+  curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)
+  ```
+  The body may have been fully transferred, but curl treats the unclean stream close
+  as a fatal error (non-zero exit code), causing the pipeline test to report "endpoint
+  unreachable". The same request succeeds immediately when forced to HTTP/1.1.
+
+- **Root cause:** API Gateway's streaming response uses chunked transfer encoding.
+  When curl negotiates HTTP/2, the streamed response body transfers correctly, but the
+  HTTP/2 stream termination (RST_STREAM or GOAWAY) is not sent cleanly by the API
+  Gateway frontend after the Lambda finishes writing. Curl interprets this as an
+  INTERNAL_ERROR on the HTTP/2 stream. HTTP/1.1 chunked transfer encoding terminates
+  cleanly with a zero-length chunk and works without issue.
+
+- **Resolution / status:** **Resolved.** Added `--http1.1` to all curl calls in both
+  `scripts/pipeline-streaming-test.sh` and `scripts/post-deploy-test.sh`. This forces
+  HTTP/1.1 regardless of the curl version's default protocol negotiation.
+
+- **AWS docs reference:** The [API Gateway response streaming troubleshooting page](https://docs.aws.amazon.com/apigateway/latest/developerguide/response-streaming-troubleshoot.html)
+  recommends using `--no-buffer` and `-i` for testing streaming but does not
+  explicitly document the HTTP/2 stream-close incompatibility. The troubleshooting
+  page only mentions `curl: (18) transfer closed with outstanding read data remaining`
+  (a timeout issue). The HTTP/2 error 92 is not covered as of June 2026 — this may be
+  a documentation gap or an issue specific to the REST API streaming integration path.
+  **TODO:** verify against official AWS docs/blogs whether this is a known limitation
+  or a transient platform bug.

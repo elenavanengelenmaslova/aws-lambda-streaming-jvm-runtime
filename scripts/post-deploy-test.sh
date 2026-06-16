@@ -268,7 +268,7 @@ http_get_timed() {
   local url="$1" body_file="$2" label="$3"
   local metrics rc=0
 
-  metrics="$(curl -sS \
+  metrics="$(curl -sS --http1.1 \
       -o "$body_file" \
       -w '%{http_code} %{time_starttransfer} %{time_total} %{size_download}' \
       "$url")" || rc=$?
