@@ -111,6 +111,78 @@ test (build + coverage + SAM validate)
     └── log.md                # Dev gotchas and fixes
 ```
 
+## Try It Yourself — Stream a Large File
+
+After deploying, you can upload any large file to the S3 source bucket and stream it back through the endpoint. Here's a full walkthrough using a ~21 MB NASA Black Marble GeoTIFF as an example.
+
+### 1. Get the bucket name and API key
+
+```bash
+# Bucket name (from stack outputs)
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+  --stack-name s3-file-streaming-endpoint \
+  --query "Stacks[0].Outputs[?OutputKey=='SourceBucketName'].OutputValue" \
+  --output text)
+
+# API key ID
+API_KEY_ID=$(aws cloudformation describe-stacks \
+  --stack-name s3-file-streaming-endpoint \
+  --query "Stacks[0].Outputs[?OutputKey=='ApiKeyId'].OutputValue" \
+  --output text)
+
+# API key value
+API_KEY=$(aws apigateway get-api-key --api-key "$API_KEY_ID" --include-value \
+  --query 'value' --output text)
+
+# Endpoint URL
+ENDPOINT_URL=$(aws cloudformation describe-stacks \
+  --stack-name s3-file-streaming-endpoint \
+  --query "Stacks[0].Outputs[?OutputKey=='StreamingEndpointUrl'].OutputValue" \
+  --output text)
+```
+
+### 2. Download a large file (e.g. NASA Black Marble)
+
+Grab a GeoTIFF from NASA's [Black Marble](https://ladsweb.modaps.eosdis.nasa.gov/missions-and-measurements/products/VNP46A2/) dataset (or any large file you want to test with):
+
+```bash
+# Example: ~21 MB Africa night lights (replace with your own file if you prefer)
+curl -L -o BlackMarble_2016_1200m_africa_s.tif \
+  "https://eoimages.gsfc.nasa.gov/images/imagerecords/144000/144898/BlackMarble_2016_1200m_africa_s.tif"
+```
+
+### 3. Upload it to the source bucket
+
+```bash
+aws s3 cp BlackMarble_2016_1200m_africa_s.tif \
+  "s3://$BUCKET_NAME/BlackMarble_2016_1200m_africa_s.tif"
+```
+
+### 4. Stream it back via the endpoint
+
+```bash
+curl -o streamed_output.tif \
+  -H "x-api-key: $API_KEY" \
+  -w '\nHTTP %{http_code} | First byte: %{time_starttransfer}s | Total: %{time_total}s | Size: %{size_download} bytes\n' \
+  "${ENDPOINT_URL}BlackMarble_2016_1200m_africa_s.tif"
+```
+
+Expected output (times vary):
+
+```
+HTTP 200 | First byte: 3.2s | Total: 8.1s | Size: 21702219 bytes
+```
+
+The first byte arrives well before the full 21 MB is delivered — proving real streaming, not buffered delivery.
+
+### 5. Verify byte integrity (optional)
+
+```bash
+cmp BlackMarble_2016_1200m_africa_s.tif streamed_output.tif \
+  && echo "PASS: byte-identical" \
+  || echo "FAIL: content mismatch"
+```
+
 ## Testing with Postman
 
 After deploy, hit the streaming endpoint:
@@ -119,12 +191,7 @@ After deploy, hit the streaming endpoint:
 GET https://<api-id>.execute-api.<region>.amazonaws.com/prod/<filename>
 ```
 
-For example, after seeding the 12 MB test object:
-```
-GET https://<api-id>.execute-api.eu-west-1.amazonaws.com/prod/streaming-test-12mb.bin
-```
-
-You should see the full 12 MB body streamed back. Check response size and time-to-first-byte in Postman's timing breakdown.
+Add the `x-api-key` header with your API key value. You should see the full body streamed back. Check response size and time-to-first-byte in Postman's timing breakdown.
 
 ## Key Design Decisions
 
@@ -132,6 +199,7 @@ You should see the full 12 MB body streamed back. Check response size and time-t
 - **Validate before commit** — status code is locked once metadata + 8 null bytes are written
 - **headObject before streaming** — confirms size for Content-Length before committing 200
 - **Fixed 1 MB buffer** — memory independent of object size
+- **API key auth** — the endpoint is protected with an API Gateway API key (`x-api-key` header). Basic auth appropriate for a demo; a production service would use IAM auth or a custom authorizer
 - **OIDC (not access keys)** — short-lived credentials in CI, no secrets to rotate
 
 ## License
