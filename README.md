@@ -199,7 +199,7 @@ Add the `x-api-key` header with your API key value. You should see the full body
 - **Validate before commit** — status code is locked once metadata + 8 null bytes are written
 - **headObject before streaming** — confirms size for Content-Length before committing 200
 - **Fixed 1 MB buffer** — memory independent of object size
-- **API key auth** — the endpoint is protected with an API Gateway API key (`x-api-key` header). Basic auth appropriate for a demo; a production service would use IAM auth or a custom authorizer
+- **API key auth** — the endpoint is protected with an API Gateway API key (`x-api-key` header). Appropriate for a demo; a production service would use IAM auth or a custom authorizer
 - **OIDC (not access keys)** — short-lived credentials in CI, no secrets to rotate
 
 ## License

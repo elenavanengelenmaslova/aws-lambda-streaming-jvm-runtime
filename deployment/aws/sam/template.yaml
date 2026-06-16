@@ -107,7 +107,7 @@ Resources:
     # No ProvisionedConcurrencyConfig anywhere - no always-on capacity (Req 11.3).
 
   # ---------------------------------------------------------------------------
-  # CloudWatch log group with a finite 30-day retention. The name matches the
+  # CloudWatch log group with a finite 7-day retention. The name matches the
   # alias-published function so SnapStart invocations log here too.
   # ---------------------------------------------------------------------------
   StreamingFunctionLogGroup:

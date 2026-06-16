@@ -50,7 +50,7 @@ class S3StreamingSub6MbIntegrationTest {
     private val bucket = "streaming-test-bucket"
 
     private val localstack: LocalStackContainer =
-        LocalStackContainer(DockerImageName.parse("localstack/localstack:3"))
+        LocalStackContainer(DockerImageName.parse("localstack/localstack:3.8.1"))
             .withServices(LocalStackContainer.Service.S3)
             .waitingFor(Wait.forHttp("/_localstack/health").forStatusCode(200))
 
@@ -90,7 +90,7 @@ class S3StreamingSub6MbIntegrationTest {
     /** Builds an [S3Client] aimed at the shared LocalStack container (path-style, static creds). */
     private fun buildClient(): S3Client = S3Client {
         region = localstack.region
-        endpointUrl = Url.parse(localstack.endpoint.toString())
+        endpointUrl = Url.parse(localstack.getEndpointOverride(LocalStackContainer.Service.S3).toString())
         forcePathStyle = true
         credentialsProvider = StaticCredentialsProvider {
             accessKeyId = localstack.accessKey

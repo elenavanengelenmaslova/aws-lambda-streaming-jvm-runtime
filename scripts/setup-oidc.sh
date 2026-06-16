@@ -19,13 +19,13 @@ STACK_NAME="streaming-example-github-oidc"
 TEMPLATE_FILE="$(dirname "$0")/../deployment/aws/oidc/github-oidc-role.yaml"
 
 # Get parameters
-read -p "Enter your GitHub organization/username [$DEFAULT_ORG]: " GITHUB_ORG
+read -r -p "Enter your GitHub organization/username [$DEFAULT_ORG]: " GITHUB_ORG
 GITHUB_ORG=${GITHUB_ORG:-$DEFAULT_ORG}
 
-read -p "Enter your GitHub repository name [$DEFAULT_REPO]: " GITHUB_REPO
+read -r -p "Enter your GitHub repository name [$DEFAULT_REPO]: " GITHUB_REPO
 GITHUB_REPO=${GITHUB_REPO:-$DEFAULT_REPO}
 
-read -p "Enter AWS region [$DEFAULT_REGION]: " AWS_REGION
+read -r -p "Enter AWS region [$DEFAULT_REGION]: " AWS_REGION
 AWS_REGION=${AWS_REGION:-$DEFAULT_REGION}
 
 # Check if you already have a GitHub OIDC provider in this account
@@ -34,7 +34,7 @@ OIDC_ARN=$(aws iam list-open-id-connect-providers --query 'OpenIDConnectProvider
 if [ -n "$OIDC_ARN" ] && [ "$OIDC_ARN" != "None" ]; then
   echo ""
   echo -e "${YELLOW}Found existing GitHub OIDC provider: $OIDC_ARN${NC}"
-  read -p "Reuse this provider? (Y/n): " REUSE
+  read -r -p "Reuse this provider? (Y/n): " REUSE
   if [[ ! $REUSE =~ ^[Nn]$ ]]; then
     EXISTING_OIDC="$OIDC_ARN"
   fi
@@ -52,7 +52,7 @@ if [ -n "$EXISTING_OIDC" ]; then
 fi
 echo ""
 
-read -p "Continue with deployment? (y/N): " CONFIRM
+read -r -p "Continue with deployment? (y/N): " CONFIRM
 if [[ ! $CONFIRM =~ ^[Yy]$ ]]; then
   echo "Deployment cancelled."
   exit 0

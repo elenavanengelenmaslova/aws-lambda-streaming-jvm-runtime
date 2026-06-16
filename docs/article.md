@@ -114,7 +114,7 @@ private fun writeMetadata(
 
 You can use your JSON library of choice. In my project, Kotlinx Serialization was the natural fit.
 
-One trap hides in that `Map<String, String>`. HTTP allows a header to appear more than once — `Set-Cookie` is the common case — and a plain string-to-string map silently collapses duplicates to a single value. The streaming metadata format supports a `cookies` array and multi-value headers for exactly this reason, so if your responses can carry repeated headers, model them as `Map<String, List<String>>` (or a dedicated `cookies` field) before you serialize, not after.
+One trap hides in that `Map<String, String>`. HTTP allows a header to appear more than once — `Set-Cookie` is the common case — but the API Gateway streaming metadata format requires plain string values in the `headers` map, not arrays. If you serialize headers as `Map<String, List<String>>` (JSON arrays for values), API Gateway rejects the response with HTTP 502. For repeated headers like `Set-Cookie`, use the separate `cookies` array field that the streaming metadata format provides.
 
 After the metadata and delimiter are written, the body can be written progressively:
 
