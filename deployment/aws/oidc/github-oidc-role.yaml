@@ -1,0 +1,335 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  GitHub Actions OIDC Role for aws-lambda-streaming-jvm-runtime deployment.
+  Hardened two-role pattern: a GitHub Actions role for orchestration and a
+  CloudFormation execution role for stack resource creation.
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Description: GitHub organization or username
+    Default: elenavanengelenmaslova
+  GitHubRepo:
+    Type: String
+    Description: GitHub repository name
+    Default: aws-lambda-streaming-jvm-runtime
+  RoleName:
+    Type: String
+    Description: Name for the GitHub Actions role
+    Default: StreamingExampleGitHubActionsRole
+  ExistingOIDCProviderArn:
+    Type: String
+    Description: ARN of an existing GitHub OIDC provider (leave empty to create a new one)
+    Default: ''
+
+Conditions:
+  CreateOIDCProvider: !Equals [!Ref ExistingOIDCProviderArn, '']
+
+Resources:
+  # S3 bucket for SAM deployment artifacts.
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'streaming-sam-artifacts-${AWS::AccountId}-${AWS::Region}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Application
+          Value: streaming-example
+        - Key: Purpose
+          Value: SAM-Deployment-Artifacts
+
+  # OIDC Identity Provider for GitHub Actions (conditional)
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateOIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+      Tags:
+        - Key: Application
+          Value: streaming-example
+        - Key: Purpose
+          Value: GitHub-Actions-OIDC
+
+  # IAM Role for GitHub Actions — orchestration + deploy permissions
+  GitHubActionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - CreateOIDCProvider
+                - !Ref GitHubOIDCProvider
+                - !Ref ExistingOIDCProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                'token.actions.githubusercontent.com:aud': sts.amazonaws.com
+              StringLike:
+                'token.actions.githubusercontent.com:sub':
+                  - !Sub 'repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/main'
+                  - !Sub 'repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/feature/*'
+                  - !Sub 'repo:${GitHubOrg}/${GitHubRepo}:environment:*'
+      Policies:
+        - PolicyName: StreamingDeploymentPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # CloudFormation permissions for SAM deployment
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:ListStacks
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:GetTemplateSummary
+                Resource: '*'
+
+              # S3 permissions scoped to SAM artifact buckets
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - 'arn:aws:s3:::aws-sam-cli-managed-default-*'
+                  - 'arn:aws:s3:::aws-sam-cli-managed-default-*/*'
+                  - !GetAtt ArtifactsBucket.Arn
+                  - !Sub '${ArtifactsBucket.Arn}/*'
+
+              # S3 bucket creation for SAM managed bucket
+              - Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                  - s3:PutBucketPolicy
+                Resource:
+                  - 'arn:aws:s3:::aws-sam-cli-managed-default-*'
+
+              # iam:PassRole scoped to CloudFormation execution role only
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: !GetAtt StreamingCloudFormationExecutionRole.Arn
+                Condition:
+                  StringEquals:
+                    'iam:PassedToService': cloudformation.amazonaws.com
+
+              # S3 permissions for the streaming test (seed object + verify).
+              # Scoped to the application bucket created by the SAM stack.
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - 'arn:aws:s3:::s3-file-streaming-endpoint-*'
+                  - 'arn:aws:s3:::s3-file-streaming-endpoint-*/*'
+
+              # s3:HeadObject is covered by s3:GetObject, but explicit for clarity
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - 'arn:aws:s3:::s3-file-streaming-endpoint-*/*'
+
+              # CloudWatch Logs read for streaming test memory check
+              - Effect: Allow
+                Action:
+                  - logs:FilterLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/s3-file-streaming-endpoint*'
+
+              # Read API key value for authenticated streaming tests
+              - Effect: Allow
+                Action:
+                  - apigateway:GET
+                Resource:
+                  - !Sub 'arn:aws:apigateway:${AWS::Region}::/apikeys/*'
+
+      Tags:
+        - Key: Application
+          Value: streaming-example
+        - Key: Purpose
+          Value: GitHub-Actions-Deployment
+
+  # CloudFormation Execution Role — assumed by CloudFormation to create/modify stack resources
+  StreamingCloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: StreamingCloudFormationExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudFormationExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Lambda permissions
+              - Effect: Allow
+                Action:
+                  - lambda:CreateFunction
+                  - lambda:UpdateFunctionCode
+                  - lambda:UpdateFunctionConfiguration
+                  - lambda:DeleteFunction
+                  - lambda:AddPermission
+                  - lambda:RemovePermission
+                  - lambda:GetPolicy
+                  - lambda:GetFunction
+                  - lambda:GetFunctionConfiguration
+                  - lambda:GetFunctionCodeSigningConfig
+                  - lambda:GetRuntimeManagementConfig
+                  - lambda:PutRuntimeManagementConfig
+                  - lambda:ListVersionsByFunction
+                  - lambda:PublishVersion
+                  - lambda:CreateAlias
+                  - lambda:UpdateAlias
+                  - lambda:DeleteAlias
+                  - lambda:GetAlias
+                  - lambda:InvokeFunction
+                  - lambda:TagResource
+                  - lambda:UntagResource
+                  - lambda:ListTags
+                Resource:
+                  - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*'
+
+              # API Gateway permissions
+              - Effect: Allow
+                Action:
+                  - apigateway:GET
+                  - apigateway:POST
+                  - apigateway:PUT
+                  - apigateway:DELETE
+                  - apigateway:PATCH
+                Resource:
+                  - !Sub 'arn:aws:apigateway:${AWS::Region}::/*'
+
+              # S3 bucket management
+              - Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                  - s3:DeleteBucket
+                  - s3:PutBucketPolicy
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                  - s3:PutEncryptionConfiguration
+                  - s3:PutBucketVersioning
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:PutLifecycleConfiguration
+                Resource: '*'
+
+              # CloudWatch Logs
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:DeleteLogGroup
+                  - logs:PutRetentionPolicy
+                  - logs:DescribeLogGroups
+                  - logs:ListTagsForResource
+                  - logs:TagLogGroup
+                  - logs:TagResource
+                  - logs:UntagResource
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+
+              # IAM role and policy management for stack resources
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:UpdateRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:PassRole
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                Resource: '*'
+
+              # SAM Serverless transform
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                Resource:
+                  - !Sub 'arn:aws:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31'
+
+      Tags:
+        - Key: Application
+          Value: streaming-example
+        - Key: Purpose
+          Value: CloudFormation-Execution
+
+Outputs:
+  GitHubActionsRoleArn:
+    Description: ARN of the GitHub Actions role
+    Value: !GetAtt GitHubActionsRole.Arn
+    Export:
+      Name: StreamingGitHubActionsRoleArn
+
+  ArtifactsBucketName:
+    Description: Name of the S3 bucket used for SAM deployment artifacts
+    Value: !Ref ArtifactsBucket
+    Export:
+      Name: StreamingArtifactsBucketName
+
+  CloudFormationExecutionRoleArn:
+    Description: ARN of the CloudFormation execution role
+    Value: !GetAtt StreamingCloudFormationExecutionRole.Arn
+    Export:
+      Name: StreamingCloudFormationExecutionRoleArn
+
+  OIDCProviderArn:
+    Description: ARN of the OIDC provider
+    Value: !If
+      - CreateOIDCProvider
+      - !Ref GitHubOIDCProvider
+      - !Ref ExistingOIDCProviderArn
+    Export:
+      Name: StreamingGitHubOIDCProviderArn
+
+  SetupInstructions:
+    Description: Instructions for completing the setup
+    Value: !Sub |
+      1. Add this secret to your GitHub repository:
+         AWS_ACCOUNT_ID: ${AWS::AccountId}
+      2. Add this variable to your GitHub repository:
+         OIDC_ROLE_NAME: ${RoleName}
+      3. Your GitHub Actions workflows can now use OIDC authentication with:
+         role-to-assume: ${GitHubActionsRole.Arn}
+      4. CloudFormation execution role for SAM deployments:
+         --role-arn ${StreamingCloudFormationExecutionRole.Arn}

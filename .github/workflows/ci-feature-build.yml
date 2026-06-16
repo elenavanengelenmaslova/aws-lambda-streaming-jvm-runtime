@@ -1,0 +1,35 @@
+name: CI - Feature Build, Deploy & Test
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/workflow-build.yml
+
+  deploy:
+    needs: test
+    uses: ./.github/workflows/workflow-deploy-aws.yml
+    with:
+      environment: default
+      aws-region: eu-west-1
+      github-actions-role-name: ${{ vars.OIDC_ROLE_NAME }}
+      stack-name: ''
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+
+  streaming-tests:
+    needs: deploy
+    uses: ./.github/workflows/workflow-streaming-test.yml
+    with:
+      aws-region: eu-west-1
+      github-actions-role-name: ${{ vars.OIDC_ROLE_NAME }}
+      stack-name: ''
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
