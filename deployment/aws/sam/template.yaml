@@ -21,21 +21,21 @@ Parameters:
     Description: Lambda timeout in seconds (bounded 1-300, within the API Gateway 300s regional idle timeout).
   LogRetentionDays:
     Type: Number
-    Default: 3
+    Default: 7
     MinValue: 1
     MaxValue: 7
-    Description: CloudWatch log retention in days (finite, 1-30, never never-expire).
+    Description: CloudWatch log retention in days (finite, 1-7).
   ObjectExpirationDays:
     Type: Number
     Default: 3
     MinValue: 1
-    MaxValue: 7
+    MaxValue: 30
     Description: Days after which current test objects expire (finite, 1-30).
   NoncurrentVersionExpirationDays:
     Type: Number
     Default: 3
     MinValue: 1
-    MaxValue: 7
+    MaxValue: 30
     Description: Days after which non-current object versions expire (finite, 1-30).
 
 # Runtime and architecture are set once here and inherited by every function.
