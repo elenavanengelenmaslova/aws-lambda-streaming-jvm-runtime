@@ -110,7 +110,7 @@ class S3StreamingSub6MbIntegrationTest {
             body = ByteStream.fromBytes(payload)
         }
 
-        val handler = StreamHandler(s3Source = { S3Source(bucket = bucket, client = s3) })
+        val handler = StreamHandler(source = { S3Source(bucket = bucket, client = s3) })
         val event = """{"pathParameters":{"proxy":"$key"}}"""
         val output = ByteArrayOutputStream()
 

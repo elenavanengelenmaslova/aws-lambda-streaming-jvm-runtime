@@ -113,7 +113,7 @@ class FifteenMbStreamingIntegrationTest {
 
         // Drive the real handler against the live S3 source, injected via the factory lambda.
         val source = S3Source(bucket = BUCKET, client = s3)
-        val handler = StreamHandler(s3Source = { source })
+        val handler = StreamHandler(source = { source })
 
         val output = ByteArrayOutputStream()
         handler.handleRequest(
