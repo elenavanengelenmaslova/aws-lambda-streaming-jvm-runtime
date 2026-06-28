@@ -58,11 +58,11 @@ class FileNameValidationZeroS3PropertyTest {
 
         if (!expectedSafe) {
             // Drive the full handler for every rejected name and prove zero S3 access + HTTP 400.
-            val s3Source = mockk<S3Source>(relaxed = true)
+            val s3Source = mockk<StreamSource>(relaxed = true)
             val handler = StreamHandler(
                 parser = ::RequestParser,
                 validator = { validator },
-                s3Source = { s3Source },
+                source = { s3Source },
                 responseWriter = ::ResponseWriter,
             )
             val output = ByteArrayOutputStream()

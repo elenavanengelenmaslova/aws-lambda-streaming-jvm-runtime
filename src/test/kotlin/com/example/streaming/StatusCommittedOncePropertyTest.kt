@@ -63,14 +63,14 @@ class StatusCommittedOncePropertyTest {
     ) {
         val parser = mockk<RequestParser>(relaxed = true)
         val validator = mockk<FileNameValidator>(relaxed = true)
-        val s3Source = mockk<S3Source>(relaxed = true)
+        val s3Source = mockk<StreamSource>(relaxed = true)
         val responseWriter = ResponseWriter() // real writer: bytes are actually committed
         val output = CapturingOutputStream()
 
         val handler = StreamHandler(
             parser = { parser },
             validator = { validator },
-            s3Source = { s3Source },
+            source = { s3Source },
             responseWriter = { responseWriter },
         )
 
@@ -113,7 +113,7 @@ class StatusCommittedOncePropertyTest {
      */
     private fun verifyPreCommit(
         scenario: Scenario,
-        s3Source: S3Source,
+        s3Source: StreamSource,
         handler: StreamHandler,
         output: CapturingOutputStream,
     ) {
@@ -136,7 +136,7 @@ class StatusCommittedOncePropertyTest {
      */
     private fun verifyPostCommit(
         scenario: Scenario,
-        s3Source: S3Source,
+        s3Source: StreamSource,
         handler: StreamHandler,
         output: CapturingOutputStream,
     ) {

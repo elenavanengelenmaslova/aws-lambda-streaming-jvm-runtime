@@ -15,18 +15,18 @@ private const val OCTET_STREAM = "application/octet-stream"
 
 /**
  * Orchestrates the streaming pipeline: parse the API Gateway proxy event, validate the
- * requested file name, confirm the S3 object, then write the streaming response. Owns the
- * top-level mapping of every outcome to an HTTP status code (400/404/502/200) and the
- * status-committed-early ordering rule.
+ * requested resource key, confirm the resource exists, then write the streaming response.
+ * Owns the top-level mapping of every outcome to an HTTP status code (400/404/502/200) and
+ * the status-committed-early ordering rule.
  *
  * Collaborators are injected by delegation (per `tech.md`): each is held in a `by lazy`
  * property fed by a factory lambda, so production uses the real defaults and tests can
  * substitute mocks without the handler depending on a wiring framework. Lazy initialization
- * also defers building the S3 client until the first real invocation.
+ * also defers building the source client until the first real invocation.
  *
  * Ordering guarantees:
  *  - No body bytes are written on any pre-commit error path — a parse failure, a validation
- *    rejection (which issues NO S3 request), a not-found, or a head failure/timeout all
+ *    rejection (which issues NO source request), a not-found, or a head failure/timeout all
  *    produce a metadata-only error response (Req 1.2/1.3/1.4, 2.7, 3.2/3.4).
  *  - Existence/size is confirmed before any metadata is written (head-before-commit).
  *  - Once metadata + the 8 null-byte delimiter are written the status is committed; a later
@@ -35,13 +35,13 @@ private const val OCTET_STREAM = "application/octet-stream"
 class StreamHandler(
     parser: () -> RequestParser = ::RequestParser,
     validator: () -> FileNameValidator = ::FileNameValidator,
-    s3Source: () -> S3Source = ::S3Source,
+    source: () -> StreamSource = ::S3Source,
     responseWriter: () -> ResponseWriter = ::ResponseWriter,
 ) : RequestStreamHandler {
 
     private val parser: RequestParser by lazy(parser)
     private val validator: FileNameValidator by lazy(validator)
-    private val s3Source: S3Source by lazy(s3Source)
+    private val source: StreamSource by lazy(source)
     private val responseWriter: ResponseWriter by lazy(responseWriter)
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
@@ -62,7 +62,7 @@ class StreamHandler(
         }
     }
 
-    /** Maps every rejection [Reason] to HTTP 400. No S3 request is issued for a rejected name (Req 2.7). */
+    /** Maps every rejection [Reason] to HTTP 400. No source request is issued for a rejected name (Req 2.7). */
     private fun writeValidationError(reason: Reason, output: OutputStream) {
         val message = when (reason) {
             Reason.MISSING -> "The file name is missing."
@@ -73,19 +73,19 @@ class StreamHandler(
             Reason.ABSOLUTE_PATH,
             -> "The file name was rejected."
         }
-        logger.warn { "File name rejected (reason=$reason); responding 400 with no S3 request" }
+        logger.warn { "File name rejected (reason=$reason); responding 400 with no source request" }
         responseWriter.writeError(output, 400, message)
     }
 
     private fun handleObject(key: String, output: OutputStream) {
-        when (val head = runBlocking { s3Source.head(key) }) {
+        when (val head = runBlocking { source.head(key) }) {
             is HeadResult.NotFound -> {
-                logger.warn { "Requested object not found; responding 404" }
+                logger.warn { "Requested resource not found; responding 404" }
                 responseWriter.writeError(output, 404, "The requested object was not found.")
             }
 
             is HeadResult.Failure -> {
-                logger.warn(head.cause) { "S3 head failed or timed out; responding 502" }
+                logger.warn(head.cause) { "Source head failed or timed out; responding 502" }
                 responseWriter.writeError(output, 502, "Object retrieval failed.")
             }
 
@@ -111,7 +111,7 @@ class StreamHandler(
         responseWriter.writeMetadata(output, metadata)
         // Status committed. From here a failure can only truncate the body — never rewrite the status.
         runCatching {
-            runBlocking { s3Source.streamBody(key, output) { output.flush() } }
+            runBlocking { source.streamBody(key, output) { output.flush() } }
         }.onFailure { e ->
             logger.error(e) { "Body stream failed after status commit; response body truncated" }
         }.getOrThrow()

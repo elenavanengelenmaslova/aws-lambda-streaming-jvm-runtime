@@ -36,7 +36,7 @@ class StreamHandlerTest {
 
     private val parser: RequestParser = mockk(relaxed = true)
     private val validator: FileNameValidator = mockk(relaxed = true)
-    private val s3Source: S3Source = mockk(relaxed = true)
+    private val s3Source: StreamSource = mockk(relaxed = true)
     private val responseWriter: ResponseWriter = mockk(relaxed = true)
 
     private val input: ByteArrayInputStream = ByteArrayInputStream(ByteArray(0))
@@ -46,7 +46,7 @@ class StreamHandlerTest {
     private val handler = StreamHandler(
         parser = { parser },
         validator = { validator },
-        s3Source = { s3Source },
+        source = { s3Source },
         responseWriter = { responseWriter },
     )
 

@@ -26,14 +26,14 @@ private val logger = KotlinLogging.logger {}
 class S3Source(
     private val bucket: String = System.getenv("BUCKET_NAME"),
     private val client: S3Client = defaultClient(),
-) {
+) : StreamSource {
     /**
      * Confirms the requested object's existence and size via `headObject`, bounded by a
      * 10 second timeout (Req 3.1). A not-found response maps to [HeadResult.NotFound]
      * (Req 3.2); any other failure, including the timeout, maps to [HeadResult.Failure]
      * (Req 3.4). Cooperative cancellation other than the timeout is propagated.
      */
-    suspend fun head(key: String): HeadResult =
+    override suspend fun head(key: String): HeadResult =
         runCatching {
             val request = HeadObjectRequest {
                 bucket = this@S3Source.bucket
@@ -75,7 +75,7 @@ class S3Source(
      *
      * @return the total number of bytes copied.
      */
-    suspend fun streamBody(key: String, sink: OutputStream, flush: () -> Unit): Long {
+    override suspend fun streamBody(key: String, sink: OutputStream, flush: () -> Unit): Long {
         val request = GetObjectRequest {
             bucket = this@S3Source.bucket
             this.key = key
