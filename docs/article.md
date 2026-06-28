@@ -12,7 +12,7 @@ Yes. AWS Lambda introduced response payload streaming on April 7, 2023 [9], init
 
 **Does it work on the JVM?**
 
-That is where it gets interesting. When I looked for guidance, the examples I found were almost exclusively JavaScript and TypeScript. AWS's own helpers — such as `awslambda.HttpResponseStream.from()` — are Node.js-only. For a Kotlin or Java Lambda, there was no equivalent library. I had to implement the streaming response protocol.
+That is where it gets interesting. When I looked for guidance, the examples I found were almost exclusively JavaScript and TypeScript. AWS's own helpers — such as `awslambda.HttpResponseStream.from()` — are Node.js-only. For a Kotlin or Java Lambda, there was no equivalent library, so I implemented the streaming response protocol and published it as **`aws-lambda-streaming-core`** [12] — a small library with no AWS SDK dependency that anyone can drop into a JVM Lambda.
 
 The original implementation of MockNest Serverless used a buffered Lambda response. That means the full response had to be built before it was returned to API Gateway.
 
@@ -361,9 +361,77 @@ These post-deploy tests answer the question:
 
 That is the test local code cannot replace.
 
+## Using the library
+
+The streaming protocol and orchestration described in the steps above are available as a library:
+
+```kotlin
+implementation("nl.vintik:aws-lambda-streaming-core:<!-- VERSION -->")
+```
+
+The library has no AWS SDK dependency. To use it, implement two interfaces.
+
+**`KeyResolver`** — reads the incoming Lambda event and returns either a resolved resource key or an error status. This is where your event parsing and input validation live:
+
+```kotlin
+class MyKeyResolver : KeyResolver {
+    override fun resolve(input: InputStream): KeyResult {
+        // parse the event, validate the key
+        return KeyResult.Resolved("my-resource-key")
+        // or: return KeyResult.Error(400, "The request was invalid.")
+    }
+}
+```
+
+**`StreamSource`** — confirms a resource exists and streams its bytes, for any backing store:
+
+```kotlin
+class DatabaseSource : StreamSource {
+    override suspend fun head(key: String): HeadResult {
+        // confirm the resource exists and return its size
+    }
+    override suspend fun streamBody(key: String, sink: OutputStream, flush: () -> Unit): Long {
+        // copy bytes to sink, calling flush() after each chunk
+    }
+}
+```
+
+Then wire both to `StreamHandler`, which is the `RequestStreamHandler` implementation:
+
+```kotlin
+class MyHandler : RequestStreamHandler {
+    private val handler = StreamHandler(
+        keyResolver = ::MyKeyResolver,
+        source = ::DatabaseSource,
+    )
+
+    override fun handleRequest(input: InputStream, output: OutputStream, context: Context) =
+        handler.handleRequest(input, output, context)
+}
+```
+
+`StreamHandler` owns the full pipeline — resolve key, head-before-commit, write metadata, stream body. `ResponseWriter` handles the metadata JSON and the eight null-byte delimiter; callers do not need to touch the wire format directly.
+
+The companion repository [12] includes `S3Source` and `FileKeyResolver` as working examples. They are intentionally not part of the library itself — `S3Source` would pull the full AWS S3 Kotlin SDK onto every consumer, and `FileKeyResolver` is specific to the API Gateway `/{proxy+}` file-serving pattern — but both are short enough to copy into your own project and adapt.
+
+```kotlin
+// S3-backed handler using the companion example's S3Source and FileKeyResolver
+class S3Handler : RequestStreamHandler {
+    private val handler = StreamHandler(
+        keyResolver = ::FileKeyResolver,
+        source = ::S3Source,
+    )
+
+    override fun handleRequest(input: InputStream, output: OutputStream, context: Context) =
+        handler.handleRequest(input, output, context)
+}
+```
+
 ## What changed in MockNest Serverless
 
-The full implementation is open source [8]. The reusable parts were not specific to MockNest:
+After implementing these mechanics I extracted the reusable parts into `aws-lambda-streaming-core` [12]. MockNest Serverless now uses the library directly — <!-- PLACEHOLDER: link to MockNest PR/commit when merged -->.
+
+The parts that moved into the library were not specific to MockNest:
 
 * switch JVM handlers to `RequestStreamHandler`
 * parse the API Gateway request from `InputStream`
@@ -442,8 +510,11 @@ https://github.com/elenavanengelenmaslova/mocknest-serverless
 [9] API Gateway documentation — Lambda proxy integration format for response streaming
 https://docs.aws.amazon.com/apigateway/latest/developerguide/response-transfer-mode-lambda.html
 
-[9] AWS What's New — AWS Lambda response payload streaming (April 7, 2023)
+[10] AWS What's New — AWS Lambda response payload streaming (April 7, 2023)
 https://aws.amazon.com/about-aws/whats-new/2023/04/aws-lambda-response-payload-streaming/
 
-[10] AWS What's New — AWS Lambda response streaming expands to all commercial AWS regions (April 7, 2026)
+[11] AWS What's New — AWS Lambda response streaming expands to all commercial AWS regions (April 7, 2026)
 https://aws.amazon.com/about-aws/whats-new/2026/04/aws-lambda-response-streaming/
+
+[12] aws-lambda-streaming-core — Maven Central / GitHub
+<!-- PLACEHOLDER: add Maven Central URL and GitHub link once published -->
