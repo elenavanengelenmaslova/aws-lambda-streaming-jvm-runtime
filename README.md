@@ -94,6 +94,7 @@ class VideoHandler : RequestStreamHandler {
         source = ::VideoSource,
     )
 
+    // StreamHandler closes the output stream automatically — do not close it in your wrapper.
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) =
         handler.handleRequest(input, output, context)
 }

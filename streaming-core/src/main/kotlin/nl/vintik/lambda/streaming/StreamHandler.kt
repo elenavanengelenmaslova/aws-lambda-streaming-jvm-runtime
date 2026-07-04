@@ -30,6 +30,8 @@ private const val OCTET_STREAM = "application/octet-stream"
  *  - Existence/size is confirmed before any metadata is written (head-before-commit).
  *  - Once metadata + the 8 null-byte delimiter are written the status is committed; a later
  *    failure can only truncate the body and propagate, never rewrite the status (Req 6.3).
+ *  - The output stream is closed by this handler before returning, finalising the streaming
+ *    response. Callers must not close it themselves.
  */
 class StreamHandler<R : Any>(
     requestResolver: () -> RequestResolver<R>,
@@ -42,9 +44,11 @@ class StreamHandler<R : Any>(
     private val responseWriter: ResponseWriter by lazy(responseWriter)
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
-        when (val result = requestResolver.resolve(input)) {
-            is RequestResult.Error -> responseWriter.writeError(output, result.statusCode, result.message)
-            is RequestResult.Resolved -> handleObject(result.request, output)
+        output.use {
+            when (val result = requestResolver.resolve(input)) {
+                is RequestResult.Error -> responseWriter.writeError(output, result.statusCode, result.message)
+                is RequestResult.Resolved -> handleObject(result.request, output)
+            }
         }
     }
 
