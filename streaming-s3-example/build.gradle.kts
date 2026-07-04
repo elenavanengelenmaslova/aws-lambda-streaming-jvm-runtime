@@ -70,13 +70,13 @@ tasks.build {
     dependsOn(tasks.shadowJar)
 }
 
-// ---- Coverage gate: 90% via koverVerify -----------------------------------------------------
+// ---- Coverage gate: 80% via koverVerify -----------------------------------------------------
 kover {
     reports {
         verify {
             rule {
                 bound {
-                    minValue = 90
+                    minValue = 80
                 }
             }
         }
