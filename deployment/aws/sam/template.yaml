@@ -71,7 +71,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: s3-file-streaming-endpoint
-      Handler: com.example.streaming.StreamHandler
+      Handler: nl.vintik.lambda.streaming.S3StreamingHandler
       CodeUri: ../../../build/dist/streaming-endpoint.jar
       MemorySize: !Ref MemorySizeMb
       Timeout: !Ref TimeoutSeconds
