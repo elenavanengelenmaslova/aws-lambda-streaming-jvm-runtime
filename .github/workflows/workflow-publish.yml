@@ -27,6 +27,8 @@ jobs:
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_SIGNING_KEY }}
+          GPG_SIGNING_KEY_BASE64: ${{ secrets.GPG_SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
-        run: ./gradlew :streaming-core:publishAndReleaseToMavenCentral --no-configuration-cache
+        run: |
+          export ORG_GRADLE_PROJECT_signingInMemoryKey="$(echo "$GPG_SIGNING_KEY_BASE64" | base64 -d)"
+          ./gradlew :streaming-core:publishAndReleaseToMavenCentral --no-configuration-cache --stacktrace
