@@ -309,10 +309,15 @@ Each entry uses the form:
   clean, and the bug only appears under timing pressure (fast/warm invocations), not
   on the slower cold-start path.
 
-- **Resolution / status:** **Resolved.** Wrapped the body of
-  `StreamHandler.handleRequest()` in `output.use { }`, which calls `close()` on every
-  exit path (normal return, error response, and uncaught exception). Also added a KDoc
-  note to `StreamHandler` and a comment in the README example clarifying that the
-  library owns the output stream lifecycle — callers must not close it themselves.
-  The fix is in `streaming-core`, so any library consumer automatically gets the
-  correct behaviour without changing their entry-point wrapper.
+- **Resolution / status:** **Resolved.** Two changes were required:
+
+  1. **`output.use { }`** — wraps the handler body so `close()` is called on every
+     exit path (normal return, error response, and uncaught exception).
+  2. **Explicit `output.flush()` before close** — added at the end of the `output.use { }`
+     block so the Lambda streaming runtime drains its buffer completely before receiving
+     the `close()` signal. Without this, a race condition in the runtime's streaming
+     channel occasionally left the last ~225 KB undelivered on fast (~1 000 ms) warm
+     invocations even after `close()` was called — an intermittent `curl: (18)` failure
+     that disappeared on retry.
+
+  Both fixes are in `StreamHandler.handleRequest()` in `streaming-s3-example`.
