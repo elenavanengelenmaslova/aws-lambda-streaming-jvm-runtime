@@ -27,6 +27,11 @@ jobs:
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_SIGNING_KEY }}
+          GPG_SIGNING_KEY_BASE64: ${{ secrets.GPG_SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
-        run: ./gradlew :streaming-core:publishAndReleaseToMavenCentral --no-configuration-cache
+        run: |
+          set -euo pipefail
+          SIGNING_KEY="$(echo "$GPG_SIGNING_KEY_BASE64" | base64 -d)" \
+            || { echo "ERROR: failed to decode GPG_SIGNING_KEY — check the secret format"; exit 1; }
+          export ORG_GRADLE_PROJECT_signingInMemoryKey="$SIGNING_KEY"
+          ./gradlew :streaming-core:publishAndReleaseToMavenCentral --no-configuration-cache --stacktrace
