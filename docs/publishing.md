@@ -74,16 +74,24 @@ One-time setup steps, then a single `git tag` to release.
 
 ## Releasing a version
 
-- [ ] Tag the commit and push:
+- [ ] Update the version in `streaming-core/build.gradle.kts`:
+
+  ```kotlin
+  version = "1.0.0"  // change to the desired release version
+  ```
+
+- [ ] Commit the version bump, tag the commit, and push:
 
   ```bash
+  git add streaming-core/build.gradle.kts
+  git commit -m "chore: bump version to 1.0.0"
   git tag v1.0.0
-  git push origin v1.0.0
+  git push origin main v1.0.0
   ```
 
 - [ ] Confirm the **publish** workflow passes in GitHub Actions.
 
-The workflow derives the version from the tag (`v1.0.0` → `1.0.0`), signs the artifacts, and publishes automatically — no manual "close and release" step required.
+The workflow triggers on any `v*` tag, signs the artifacts using the GPG key from `GPG_SIGNING_KEY`, and publishes using `publishAndReleaseToMavenCentral` — no manual "close and release" step required. The version published is whatever is set in `streaming-core/build.gradle.kts`; the tag is used only to trigger the workflow.
 
 ---
 
@@ -93,6 +101,6 @@ The workflow derives the version from the tag (`v1.0.0` → `1.0.0`), signs the 
   - https://central.sonatype.com/artifact/nl.vintik/aws-lambda-streaming-core
   - https://search.maven.org/artifact/nl.vintik/aws-lambda-streaming-core
 - [ ] Update the version placeholder in `README.md` and `docs/article.md`:
-  ```
+  ```kotlin
   implementation("nl.vintik:aws-lambda-streaming-core:<!-- VERSION -->")
   ```

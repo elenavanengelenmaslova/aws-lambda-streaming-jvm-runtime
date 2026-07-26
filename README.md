@@ -23,7 +23,7 @@ The library handles:
 implementation("nl.vintik:aws-lambda-streaming-core:<!-- VERSION -->")
 ```
 
-No AWS SDK dependency. The library only depends on `aws-lambda-java-core` (the `RequestStreamHandler` interface) and `kotlinx-serialization-json` (metadata encoding).
+No AWS SDK dependency. The library depends on `aws-lambda-java-core` (the `RequestStreamHandler` interface), `kotlinx-serialization-json` (metadata encoding), and `kotlin-logging-jvm` (SLF4J logging facade). An SLF4J provider (e.g. `slf4j-simple`) must be on the runtime classpath.
 
 ## Usage
 
@@ -35,22 +35,26 @@ class MyHandler : RequestStreamHandler {
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
         output.use {
-            // --- parse input and validate ---
-            // on error:
-            writer.writeError(output, 400, "The request could not be parsed.")
-            return
+            // --- parse and validate ---
+            val request = parseRequest(input)  // returns null on invalid input
+            if (request == null) {
+                writer.writeError(output, 400, "The request could not be parsed.")
+                return@use
+            }
 
-            // --- on success: write metadata, then stream body ---
-            val metadata = ResponseMetadata(
+            // --- success: write metadata, then stream body ---
+            val contentLength: Long = request.contentLength
+            val sourceStream: InputStream = request.openStream()
+            writer.writeMetadata(output, ResponseMetadata(
                 statusCode = 200,
                 headers = mapOf(
                     "Content-Type" to "application/octet-stream",
                     "Content-Length" to contentLength.toString(),
                 ),
-            )
-            writer.writeMetadata(output, metadata)
+            ))
             // status is now committed — stream body bytes
             copy(sourceStream, output) { output.flush() }
+            output.flush()
         }
     }
 }

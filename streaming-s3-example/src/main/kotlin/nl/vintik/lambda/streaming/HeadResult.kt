@@ -8,7 +8,10 @@ package nl.vintik.lambda.streaming
  * to HTTP 404; [Failure] (any non-missing error or timeout) maps to HTTP 502.
  */
 sealed interface HeadResult {
-    data class Exists(val size: Long) : HeadResult
+    /** @param size non-negative content length in bytes, used for `Content-Length`. */
+    data class Exists(val size: Long) : HeadResult {
+        init { require(size >= 0) { "size must be >= 0 but was $size" } }
+    }
     data object NotFound : HeadResult
     data class Failure(val cause: Throwable) : HeadResult
 }
