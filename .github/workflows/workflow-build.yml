@@ -32,13 +32,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Run tests with coverage
-        run: ./gradlew test koverHtmlReport koverVerify
+        run: ./gradlew :streaming-core:test :streaming-core:koverHtmlReport :streaming-core:koverVerify :streaming-s3-example:test -PexcludeTags=integration
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
-          path: build/reports/kover/html/
+          path: streaming-core/build/reports/kover/html/
 
   validate-sam:
     runs-on: ubuntu-latest

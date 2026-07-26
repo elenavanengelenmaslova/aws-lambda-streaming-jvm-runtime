@@ -278,3 +278,41 @@ Each entry uses the form:
   a documentation gap or an issue specific to the REST API streaming integration path.
   **TODO:** verify against official AWS docs/blogs whether this is a known limitation
   or a transient platform bug.
+
+---
+
+## Lambda streaming: `OutputStream` must be closed explicitly — partial body on warm invocations
+
+- **Symptom / trigger:** The pipeline TTFB test (`scripts/pipeline-streaming-test.sh`)
+  consistently failed with:
+  ```
+  curl: (18) transfer closed with 4112195 bytes remaining to read
+  ```
+  The first invocation after SnapStart restore delivered all 12 MB correctly.
+  Every subsequent warm invocation delivered exactly 8 470 717 bytes (~8.4 MB)
+  and then closed the connection, leaving 4 112 195 bytes undelivered — despite
+  no errors anywhere in the Lambda CloudWatch logs and a normal `REPORT` line
+  (Duration ~1 000 ms, no timeout).
+
+- **Root cause:** `StreamHandler.handleRequest()` wrote to the `OutputStream` but
+  never called `close()` on it. AWS Lambda streaming requires the handler to close
+  the output stream to signal to the runtime that the response is complete. Without
+  an explicit `close()`, the runtime flushes what it can before tearing down the
+  execution environment — on a slow first invocation (6 390 ms with SnapStart restore)
+  there happened to be enough time for the runtime's own cleanup to flush everything;
+  on fast warm invocations (~1 000 ms) the Lambda exited before the runtime finished
+  delivering the remaining ~3.6 MB to API Gateway.
+
+  The AWS documentation states: *"You should close the output stream at the end of
+  your handler function."* This requirement is easy to miss because omitting `close()`
+  does not produce any error — the handler exits normally, the CloudWatch logs are
+  clean, and the bug only appears under timing pressure (fast/warm invocations), not
+  on the slower cold-start path.
+
+- **Resolution / status:** **Resolved.** Wrapped the body of
+  `StreamHandler.handleRequest()` in `output.use { }`, which calls `close()` on every
+  exit path (normal return, error response, and uncaught exception). Also added a KDoc
+  note to `StreamHandler` and a comment in the README example clarifying that the
+  library owns the output stream lifecycle — callers must not close it themselves.
+  The fix is in `streaming-core`, so any library consumer automatically gets the
+  correct behaviour without changing their entry-point wrapper.

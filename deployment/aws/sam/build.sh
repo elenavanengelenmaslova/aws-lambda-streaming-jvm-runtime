@@ -18,9 +18,9 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 cd "${REPO_ROOT}"
 
 echo "==> Building shadow fat jar (clean build) from ${REPO_ROOT}"
-# 'build' runs the shadow plugin's shadowJar task plus the test/verification
-# tasks; the resulting fat jar lands in build/libs/.
-./gradlew clean build
+# ':streaming-s3-example:build' runs the shadow plugin's shadowJar task plus tests;
+# the resulting fat jar lands in build/dist/.
+./gradlew clean :streaming-s3-example:build
 
-echo "==> Fat jar(s) produced in build/libs/:"
-ls -1 build/libs/*.jar
+echo "==> Fat jar produced in build/dist/:"
+ls -1 build/dist/*.jar

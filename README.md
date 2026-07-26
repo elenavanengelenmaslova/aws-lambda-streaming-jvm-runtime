@@ -1,206 +1,139 @@
-# AWS Lambda Streaming JVM Runtime
+# aws-lambda-streaming-core
 
-A minimal example proving **HTTP response streaming** from a **Kotlin/JVM AWS Lambda** behind Amazon API Gateway — streaming a 12+ MB S3 object to the client without ever buffering the whole body in memory.
+A JVM library that implements the **AWS Lambda / API Gateway HTTP response streaming protocol** for Kotlin and Java.
 
-AWS's streaming helpers (`awslambda.HttpResponseStream.from()`) are Node.js-only. On the JVM the API Gateway streaming response protocol (metadata JSON → 8 null bytes → body) is implemented by hand using a `RequestStreamHandler`.
+AWS provides Node.js helpers (`HttpResponseStream.from()`) that hide the wire format. On the JVM there is no equivalent — you write the protocol by hand or use this library.
 
-## What It Does
+## What the library does
 
-1. Accepts a GET request naming a file
-2. Validates the file name (allow-list, no path traversal)
-3. Confirms the S3 object exists (headObject with 10s timeout)
-4. Streams the object through a fixed 1 MB buffer with per-chunk flush
-5. Delivers payloads well past the legacy 6 MB buffered Lambda limit
-
-## Stack
-
-- **Kotlin 2.3.x / Java 25** (Gradle 9, single module)
-- **AWS SAM** — Lambda + API Gateway REST (RESPONSE_STREAM) + S3
-- **SnapStart** + CRaC priming + arm64 + tiered compilation (L1)
-- **TestContainers + LocalStack** for integration tests (Colima, not Docker Desktop)
-- **91%+ code coverage** (Kover, 90% gate)
-
-## Quick Start
-
-### Prerequisites
-
-- JDK 25 (temurin)
-- AWS CLI + SAM CLI
-- Colima running (for integration tests)
-
-### Build and Test
-
-```bash
-./gradlew clean test                    # unit + property + integration tests
-./gradlew koverHtmlReport koverVerify   # coverage report + 90% gate
-sam validate --template-file deployment/aws/sam/template.yaml
-```
-
-### Deploy Manually
-
-```bash
-cd deployment/aws/sam
-./build.sh    # shadow fat JAR
-./deploy.sh   # sam build + sam deploy
-```
-
-### Seed a Test Object and Verify
-
-```bash
-# The script seeds a 12 MB object if not present, then verifies streaming
-./scripts/pipeline-streaming-test.sh
-```
-
-## CI/CD Pipeline (GitHub Actions)
-
-The pipeline builds, deploys, and tests streaming end-to-end:
+When a Lambda is configured for response streaming, API Gateway expects a specific binary format on the output stream:
 
 ```
-test (build + coverage + SAM validate)
-  → deploy (OIDC → build JAR → sam deploy)
-    → streaming-tests (seed 12 MB → verify delivery + TTFB)
+[metadata JSON] [8 null bytes] [body bytes…]
 ```
 
-### One-Time Setup
+The library handles:
 
-1. **Bootstrap the OIDC role** (run once from your local machine with AWS credentials):
+- **Protocol encoding** — serializes the metadata JSON (`statusCode`, `headers`) and writes the 8-byte delimiter before any body bytes (`ResponseWriter`)
+- **Head-before-commit** — confirms the resource exists and its size before writing the metadata, so `Content-Length` is known and the status cannot be changed once written
+- **Memory-bounded streaming** — copies the body through a fixed 1 MB buffer with per-chunk flush, keeping memory flat regardless of payload size (`BoundedBuffer`)
+- **Full pipeline orchestration** — resolves the request, checks existence, writes metadata, streams the body, maps every error (parse failure / not-found / source failure / mid-stream failure) to the correct HTTP status (`StreamHandler`)
 
-   ```bash
-   ./scripts/setup-oidc.sh
-   ```
+You provide two things:
 
-   This creates:
-   - `StreamingExampleGitHubActionsRole` — GitHub Actions assumes this via OIDC
-   - `StreamingCloudFormationExecutionRole` — CloudFormation assumes this to create stack resources
-   - `streaming-sam-artifacts-<account>-<region>` — S3 bucket for deployment artifacts
+| Your implementation | Library interface | What it does |
+|---|---|---|
+| `MyRequestResolver` | `RequestResolver<R>` | Reads the Lambda event stream, returns a typed request `R` or an error status |
+| `MySource` | `StreamSource<R>` | Given `R`, confirms the resource exists (`head`) and streams it (`streamBody`) |
 
-   The script detects and reuses an existing GitHub OIDC provider if you have one from another project.
+## Dependency
 
-2. **Add to GitHub repository settings** (Settings → Secrets and variables → Actions):
-
-   | Name | Type | Value |
-   |------|------|-------|
-   | `AWS_ACCOUNT_ID` | Secret | Your 12-digit AWS account ID |
-   | `OIDC_ROLE_NAME` | Variable | `StreamingExampleGitHubActionsRole` |
-
-3. **Trigger the pipeline**: Actions → "CD - Deploy On Demand" → Run workflow
-
-### Pipeline Inputs
-
-| Input | Default | Description |
-|-------|---------|-------------|
-| `stack-name` | (from samconfig.toml) | CloudFormation stack name override |
-| `aws-region` | `eu-west-1` | AWS region |
-| `github-actions-role-name` | (from OIDC_ROLE_NAME variable) | OIDC role name override |
-
-## Project Structure
-
-```
-.
-├── src/main/kotlin/          # Handler, parser, validator, S3 source, writer, priming
-├── src/test/kotlin/          # Unit, property, and integration tests
-├── deployment/aws/sam/       # SAM template + config + build/deploy scripts
-├── deployment/aws/oidc/      # OIDC bootstrap CloudFormation template
-├── scripts/
-│   ├── setup-oidc.sh         # One-time OIDC role setup
-│   ├── pipeline-streaming-test.sh  # CI streaming validation
-│   └── post-deploy-test.sh   # Full post-deploy verification (memory + timing)
-├── .github/workflows/        # GitHub Actions CI/CD
-└── docs/
-    ├── article.md            # The published guide
-    └── log.md                # Dev gotchas and fixes
+```kotlin
+implementation("nl.vintik:aws-lambda-streaming-core:<!-- VERSION -->")
 ```
 
-## Try It Yourself — Stream a Large File
+No AWS SDK dependency. The library only depends on `aws-lambda-java-core` (the `RequestStreamHandler` interface), `kotlinx-serialization-json` (metadata encoding), and `kotlinx-coroutines-core`.
 
-After deploying, you can upload any large file to the S3 source bucket and stream it back through the endpoint. Here's a full walkthrough using a ~21 MB NASA Black Marble GeoTIFF as an example.
+## Usage
 
-### 1. Get the bucket name and API key
+### 1. Define your request type
 
-```bash
-# Bucket name (from stack outputs)
-BUCKET_NAME=$(aws cloudformation describe-stacks \
-  --stack-name s3-file-streaming-endpoint \
-  --query "Stacks[0].Outputs[?OutputKey=='SourceBucketName'].OutputValue" \
-  --output text)
-
-# API key ID
-API_KEY_ID=$(aws cloudformation describe-stacks \
-  --stack-name s3-file-streaming-endpoint \
-  --query "Stacks[0].Outputs[?OutputKey=='ApiKeyId'].OutputValue" \
-  --output text)
-
-# API key value
-API_KEY=$(aws apigateway get-api-key --api-key "$API_KEY_ID" --include-value \
-  --query 'value' --output text)
-
-# Endpoint URL
-ENDPOINT_URL=$(aws cloudformation describe-stacks \
-  --stack-name s3-file-streaming-endpoint \
-  --query "Stacks[0].Outputs[?OutputKey=='StreamingEndpointUrl'].OutputValue" \
-  --output text)
+```kotlin
+data class VideoRequest(val videoId: String, val quality: String)
 ```
 
-### 2. Download a large file (e.g. NASA Black Marble)
+### 2. Implement `RequestResolver<R>`
 
-Grab a GeoTIFF from NASA's [Black Marble](https://ladsweb.modaps.eosdis.nasa.gov/missions-and-measurements/products/VNP46A2/) dataset (or any large file you want to test with):
+Reads and validates the incoming Lambda event. Returns `RequestResult.Resolved(request)` or `RequestResult.Error(statusCode, message)`.
 
-```bash
-# Example: ~21 MB Africa night lights (replace with your own file if you prefer)
-curl -L -o BlackMarble_2016_1200m_africa_s.tif \
-  "https://eoimages.gsfc.nasa.gov/images/imagerecords/144000/144898/BlackMarble_2016_1200m_africa_s.tif"
+The library provides a `jsonRequestResolver<Event, R>` helper that handles JSON deserialization for you:
+
+```kotlin
+@Serializable
+data class ApiGatewayEvent(val pathParameters: Map<String, String?>? = null)
+
+val videoResolver = jsonRequestResolver<ApiGatewayEvent, VideoRequest> { event ->
+    val videoId = event.pathParameters?.get("videoId")
+        ?: return@jsonRequestResolver RequestResult.Error(400, "Missing video ID.")
+    val quality = event.pathParameters["quality"] ?: "hd"
+    RequestResult.Resolved(VideoRequest(videoId, quality))
+}
 ```
 
-### 3. Upload it to the source bucket
+JSON parse failures (empty stream, malformed JSON) are caught automatically and returned as HTTP 400. The default `Json` instance uses `ignoreUnknownKeys = true` so you only declare the fields you need.
 
-```bash
-aws s3 cp BlackMarble_2016_1200m_africa_s.tif \
-  "s3://$BUCKET_NAME/BlackMarble_2016_1200m_africa_s.tif"
+You can also implement `RequestResolver<R>` directly as a class or `fun interface` lambda if you need more control over the event format.
 ```
 
-### 4. Stream it back via the endpoint
+### 3. Implement `StreamSource<R>`
 
-```bash
-curl -o streamed_output.tif \
-  -H "x-api-key: $API_KEY" \
-  -w '\nHTTP %{http_code} | First byte: %{time_starttransfer}s | Total: %{time_total}s | Size: %{size_download} bytes\n' \
-  "${ENDPOINT_URL}BlackMarble_2016_1200m_africa_s.tif"
+Confirms the resource exists (`head`) and streams it (`streamBody`).
+
+```kotlin
+class VideoSource : StreamSource<VideoRequest> {
+    override suspend fun head(request: VideoRequest): HeadResult {
+        val metadata = db.findVideo(request.videoId, request.quality)
+            ?: return HeadResult.NotFound
+        return HeadResult.Exists(metadata.sizeBytes)
+    }
+
+    override suspend fun streamBody(request: VideoRequest, sink: OutputStream, flush: () -> Unit): Long {
+        return storage.openStream(request.videoId, request.quality).use { stream ->
+            BoundedBuffer.copy(stream, sink, flush)
+        }
+    }
+}
 ```
 
-Expected output (times vary):
+### 4. Wire to `StreamHandler` (your Lambda entry point)
 
-```
-HTTP 200 | First byte: 3.2s | Total: 8.1s | Size: 21702219 bytes
-```
+```kotlin
+class VideoHandler : RequestStreamHandler {
+    private val handler = StreamHandler(
+        requestResolver = ::VideoRequestResolver,
+        source = ::VideoSource,
+    )
 
-The first byte arrives well before the full 21 MB is delivered — proving real streaming, not buffered delivery.
-
-### 5. Verify byte integrity (optional)
-
-```bash
-cmp BlackMarble_2016_1200m_africa_s.tif streamed_output.tif \
-  && echo "PASS: byte-identical" \
-  || echo "FAIL: content mismatch"
-```
-
-## Testing with Postman
-
-After deploy, hit the streaming endpoint:
-
-```
-GET https://<api-id>.execute-api.<region>.amazonaws.com/prod/<filename>
+    // StreamHandler closes the output stream automatically — do not close it in your wrapper.
+    override fun handleRequest(input: InputStream, output: OutputStream, context: Context) =
+        handler.handleRequest(input, output, context)
+}
 ```
 
-Add the `x-api-key` header with your API key value. You should see the full body streamed back. Check response size and time-to-first-byte in Postman's timing breakdown.
+## HTTP status mapping
 
-## Key Design Decisions
+`StreamHandler` maps every outcome automatically:
 
-- **`RequestStreamHandler`** over `RequestHandler` — only way to get raw `OutputStream` access for the streaming protocol
-- **Validate before commit** — status code is locked once metadata + 8 null bytes are written
-- **headObject before streaming** — confirms size for Content-Length before committing 200
-- **Fixed 1 MB buffer** — memory independent of object size
-- **API key auth** — the endpoint is protected with an API Gateway API key (`x-api-key` header). Appropriate for a demo; a production service would use IAM auth or a custom authorizer
-- **OIDC (not access keys)** — short-lived credentials in CI, no secrets to rotate
+| Outcome | HTTP status |
+|---|---|
+| `RequestResult.Error` | Whatever status you return (e.g. 400) |
+| `HeadResult.NotFound` | 404 |
+| `HeadResult.Failure` | 502 |
+| `HeadResult.Exists` → stream | 200 with `Content-Length` |
+
+Once the 200 metadata + delimiter are written, the status is committed. A mid-stream failure truncates the body but cannot change the status.
+
+## API reference
+
+| Type | Description |
+|---|---|
+| `jsonRequestResolver<Event, R> { event -> ... }` | Helper: deserializes the Lambda event JSON to `Event`, maps it to `RequestResult<R>` |
+| `RequestResolver<out R>` | `fun interface` — implement directly if you need custom event parsing |
+| `RequestResult.Resolved<R>` | Carries the typed request to pass to `StreamSource` |
+| `RequestResult.Error` | Carries an HTTP status + message; no source request is issued |
+| `StreamSource<in R>` | Implement `head(request)` and `streamBody(request, sink, flush)` |
+| `HeadResult.Exists(size)` / `.NotFound` / `.Failure(cause)` | Outcomes of `head` |
+| `StreamHandler<R>` | Wires resolver + source; implements `RequestStreamHandler` |
+| `ResponseWriter` | Writes the metadata JSON + 8-byte delimiter (available directly if needed) |
+| `ResponseMetadata` | Data class: `statusCode` + `headers` map |
+| `BoundedBuffer.copy(source, sink, flush)` | 1 MB bounded copy utility |
+| `LambdaJson` | Lenient `Json` instance (`ignoreUnknownKeys = true`) for decoding Lambda events |
+
+## S3 example
+
+The companion module `streaming-s3-example` is a complete AWS Lambda deployment that streams files from S3 using this library. It includes `FileKeyResolver`, `FileRequest`, and `S3Source` as reference implementations of `RequestResolver` and `StreamSource`.
+
+See [`streaming-s3-example/README.md`](streaming-s3-example/README.md) for deployment instructions.
 
 ## License
 
