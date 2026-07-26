@@ -20,7 +20,10 @@ dependencies {
     implementation("io.github.oshai:kotlin-logging-jvm:${rootProject.extra["kotlinLoggingVersion"]}")
     implementation("org.slf4j:slf4j-simple:2.0.16")
 
-    // --- Serialization (RequestParser uses kotlinx-serialization in main source) ---
+    // --- Coroutines (StreamHandler uses runBlocking) ---
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.extra["coroutinesVersion"]}")
+
+    // --- Serialization (RequestParser and JsonRequestResolver use kotlinx-serialization) ---
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${rootProject.extra["kotlinxSerializationVersion"]}")
 
     // --- CRaC priming hook for SnapStart ---

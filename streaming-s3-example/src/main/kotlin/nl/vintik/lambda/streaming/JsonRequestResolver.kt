@@ -29,7 +29,7 @@ val LambdaJson: Json = Json { ignoreUnknownKeys = true }
  * val resolver = jsonRequestResolver<GatewayEvent, VideoRequest> { event ->
  *     val id = event.pathParameters?.get("videoId")
  *         ?: return@jsonRequestResolver RequestResult.Error(400, "Missing video ID.")
- *     RequestResult.Resolved(VideoRequest(id, event.pathParameters["quality"] ?: "hd"))
+ *     RequestResult.Resolved(VideoRequest(id, event.pathParameters?.get("quality") ?: "hd"))
  * }
  * ```
  *

@@ -18,9 +18,6 @@ dependencies {
     // --- Serialization ---
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${rootProject.extra["kotlinxSerializationVersion"]}")
 
-    // --- Coroutines (runBlocking in StreamHandler) ---
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.extra["coroutinesVersion"]}")
-
     // --- Logging ---
     implementation("io.github.oshai:kotlin-logging-jvm:${rootProject.extra["kotlinLoggingVersion"]}")
     implementation("org.slf4j:slf4j-simple:2.0.16")
@@ -28,7 +25,6 @@ dependencies {
     // --- Testing ---
     testImplementation("org.junit.jupiter:junit-jupiter:${rootProject.extra["junitVersion"]}")
     testImplementation("io.mockk:mockk:${rootProject.extra["mockkVersion"]}")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${rootProject.extra["coroutinesVersion"]}")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -77,7 +73,7 @@ mavenPublishing {
 
     pom {
         name = "AWS Lambda Streaming Core"
-        description = "JVM implementation of the AWS Lambda / API Gateway streaming response protocol (metadata JSON + 8-byte delimiter + body). No AWS SDK dependency — implement StreamSource for any backing store."
+        description = "JVM implementation of the AWS Lambda / API Gateway streaming response protocol (metadata JSON + 8-byte delimiter + body). ResponseWriter encodes the wire format; BoundedBuffer streams large payloads with bounded memory. No AWS SDK dependency."
         url = "https://github.com/elenavanengelenmaslova/aws-lambda-streaming-jvm-runtime"
         licenses {
             license {
