@@ -6,21 +6,21 @@ plugins {
     kotlin("plugin.serialization")
     id("com.vanniktech.maven.publish") version "0.31.0"
     id("org.jetbrains.kotlinx.kover")
+    id("org.jetbrains.kotlinx.binary-compatibility-validator") version "0.18.1"
 }
 
 group = "nl.vintik"
-version = "1.0.0"
+
+// The published version comes from -PreleaseVersion, which the publish workflow derives from the
+// git tag. Keeping it out of this file means the tag is the single source of truth: a tag can no
+// longer trigger a release that publishes some other, stale version number.
+version = providers.gradleProperty("releaseVersion").getOrElse("2.0.0-SNAPSHOT")
 
 dependencies {
-    // --- AWS Lambda runtime contracts ---
-    implementation("com.amazonaws:aws-lambda-java-core:${rootProject.extra["awsLambdaCoreVersion"]}")
-
     // --- Serialization ---
+    // The only runtime dependency. No AWS artifacts: this module implements the wire protocol and
+    // never touches the Lambda or S3 APIs, so consumers pick their own AWS dependencies.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${rootProject.extra["kotlinxSerializationVersion"]}")
-
-    // --- Logging ---
-    implementation("io.github.oshai:kotlin-logging-jvm:${rootProject.extra["kotlinLoggingVersion"]}")
-    testRuntimeOnly("org.slf4j:slf4j-simple:2.0.16")
 
     // --- Testing ---
     testImplementation("org.junit.jupiter:junit-jupiter:${rootProject.extra["junitVersion"]}")
@@ -29,6 +29,8 @@ dependencies {
 }
 
 // ---- Toolchain & compilation: Java 21 (LTS, Lambda-standard) --------------------------------
+// Deliberately below the example module's Java 25: a library's bytecode target is a floor for
+// every consumer, and java21 remains a supported Lambda runtime.
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -36,6 +38,9 @@ java {
 }
 
 kotlin {
+    // Every public declaration must state its visibility and return type — no accidental API.
+    explicitApi()
+
     compilerOptions {
         jvmTarget = JvmTarget.JVM_21
     }
@@ -73,7 +78,7 @@ mavenPublishing {
 
     pom {
         name = "AWS Lambda Streaming Core"
-        description = "JVM implementation of the AWS Lambda / API Gateway streaming response protocol (metadata JSON + 8-byte delimiter + body). ResponseWriter encodes the wire format; copy() streams large payloads with bounded memory. No AWS SDK dependency."
+        description = "JVM implementation of the AWS Lambda / API Gateway streaming response protocol (metadata JSON + 8-byte delimiter + body). ResponseWriter encodes the wire format; copy() streams large payloads with bounded memory. Depends only on kotlinx-serialization — no AWS artifacts, no logging framework."
         url = "https://github.com/elenavanengelenmaslova/aws-lambda-streaming-jvm-runtime"
         licenses {
             license {

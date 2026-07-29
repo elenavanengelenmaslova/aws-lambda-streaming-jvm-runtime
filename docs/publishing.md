@@ -34,21 +34,26 @@ One-time setup steps, then a single `git tag` to release.
   ```
 
 - [x] Note down the key ID (or find it later with `gpg --list-secret-keys`).
-  Key: `D1706CFEB3C8FEE3`
+  Key: `B6CF7D736D2A83A4C6B37EC8252674D63D7F47EA`
 
 - [x] Upload the **public key** to a keyserver so Maven Central can verify signatures:
 
   ```bash
-  gpg --keyserver keyserver.ubuntu.com --send-keys YOUR_KEY_ID
+  gpg --keyserver keyserver.ubuntu.com --send-keys B6CF7D736D2A83A4C6B37EC8252674D63D7F47EA
   ```
 
-- [ ] Export the **private key** (needed for the GitHub secret):
+- [ ] Export the **private key** as a base64-encoded single line for the GitHub secret.
+  The workflow decodes it at runtime, avoiding newline-handling issues with multiline secrets:
 
   ```bash
-  gpg --export-secret-keys --armor D1706CFEB3C8FEE3 > ~/signing-key.asc
+  gpg --export-secret-keys --armor B6CF7D736D2A83A4C6B37EC8252674D63D7F47EA \
+    | base64 | tr -d '\n'
   ```
 
-> Keep `signing-key.asc` safe and do not commit it.
+  Copy the single-line output — that is the value for `GPG_SIGNING_KEY`.
+  The publish workflow decodes it with `base64 -d` before passing it to Gradle.
+
+> Never save the private key to a file or commit it. Run the export command and paste directly into the GitHub secret.
 
 ---
 

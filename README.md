@@ -20,10 +20,12 @@ The library handles:
 ## Dependency
 
 ```kotlin
-implementation("nl.vintik:aws-lambda-streaming-core:<!-- VERSION -->")
+implementation("nl.vintik:aws-lambda-streaming-core:2.0.0")
 ```
 
-No AWS SDK dependency. The library depends on `aws-lambda-java-core` (the `RequestStreamHandler` interface), `kotlinx-serialization-json` (metadata encoding), and `kotlin-logging-jvm` (SLF4J logging facade). An SLF4J provider (e.g. `slf4j-simple`) must be on the runtime classpath.
+**One dependency:** `kotlinx-serialization-json`, for metadata encoding. No AWS artifacts — this module implements the wire protocol and never touches the Lambda or S3 APIs, so you bring your own `aws-lambda-java-core` for the `RequestStreamHandler` interface. No logging framework either: every failure propagates to your code, which has the request context needed to log it usefully.
+
+Compiled for **Java 21**, so it runs on the `java21` and `java25` Lambda runtimes alike.
 
 ## Usage
 
@@ -53,7 +55,7 @@ class MyHandler : RequestStreamHandler {
                 ),
             ))
             // status is now committed — stream body bytes
-            copy(sourceStream, output) { output.flush() }
+            copy(sourceStream, output)
             output.flush()
         }
     }
@@ -68,10 +70,27 @@ class MyHandler : RequestStreamHandler {
 |---|---|
 | `ResponseWriter` | Writes the metadata JSON + 8-byte delimiter |
 | `ResponseWriter.writeMetadata(output, metadata)` | Commits status + headers, writes delimiter |
-| `ResponseWriter.writeError(output, status, message)` | Writes an error response (metadata + JSON body) |
-| `ResponseMetadata` | Data class: `statusCode: Int`, `headers: Map<String, String>` |
-| `copy(source, sink, flush)` | 1 MB bounded copy utility for streaming body bytes |
+| `ResponseWriter.writeResponse(output, metadata, body?)` | Whole response in one call: metadata, delimiter, optional body, flush |
+| `ResponseWriter.writeError(output, status, message)` | Convenience error response — `application/json` with a `{"message":…}` body. For any other shape, build it and call `writeResponse` |
+| `ResponseMetadata` | Data class: `statusCode: Int`, `headers: Map<String, String>`, `cookies: List<String>?` |
+| `ResponseMetadata.fromMultiValue(status, headers)` | Collapses `Map<String, List<String>>` — joins values with `", "`, routes `Set-Cookie` to `cookies` |
+| `copy(source, sink, flush?)` | 1 MB bounded copy utility; `flush` defaults to flushing the sink |
 | `DELIMITER_LEN` | The 8-byte delimiter length constant |
+| `OBSERVED_MAX_PRELUDE_LEN` | Optional prelude ceiling — see below |
+
+### Repeated headers and `Set-Cookie`
+
+The prelude models headers as name → single value, so repeated headers have to be collapsed. `fromMultiValue` joins them with `", "` — except `Set-Cookie`, which it routes to the dedicated `cookies` array. Comma-joining cookies would corrupt them, since a comma is legal inside a cookie's `Expires` date and clients would mis-split the result. When there are no cookies the field is omitted from the JSON entirely.
+
+### Optional prelude size limit
+
+By default the writer imposes no size limit, matching AWS's reference implementation, which validates nothing. If you would rather fail fast than let an oversized prelude reach the runtime — where it may be rejected or silently folded into the response body — opt in:
+
+```kotlin
+val writer = ResponseWriter(maxPreludeLen = OBSERVED_MAX_PRELUDE_LEN)
+```
+
+An oversized prelude then raises `MetadataTooLargeException` **before anything is written**, so the stream is untouched and the status is still uncommitted — you can write a different response instead. Note that `OBSERVED_MAX_PRELUDE_LEN` (16376) is not an AWS-documented limit; it is the commonly cited 16 KiB budget less the delimiter.
 
 ## S3 example
 

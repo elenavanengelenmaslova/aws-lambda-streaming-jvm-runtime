@@ -29,9 +29,22 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           GPG_SIGNING_KEY_BASE64: ${{ secrets.GPG_SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
+          TAG_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+
+          # The tag is the single source of truth for the published version. Deriving it here —
+          # rather than reading a hardcoded value out of the build script — is what stops a
+          # `vX.Y.Z` tag from publishing some unrelated version.
+          RELEASE_VERSION="${TAG_NAME#v}"
+          case "$RELEASE_VERSION" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "ERROR: tag '$TAG_NAME' is not a vMAJOR.MINOR.PATCH release tag"; exit 1 ;;
+          esac
+          echo "Publishing version $RELEASE_VERSION from tag $TAG_NAME"
+
           SIGNING_KEY="$(echo "$GPG_SIGNING_KEY_BASE64" | base64 -d)" \
             || { echo "ERROR: failed to decode GPG_SIGNING_KEY — check the secret format"; exit 1; }
           export ORG_GRADLE_PROJECT_signingInMemoryKey="$SIGNING_KEY"
-          ./gradlew :streaming-core:publishAndReleaseToMavenCentral --no-configuration-cache --stacktrace
+          ./gradlew :streaming-core:publishAndReleaseToMavenCentral \
+            -PreleaseVersion="$RELEASE_VERSION" --no-configuration-cache --stacktrace
