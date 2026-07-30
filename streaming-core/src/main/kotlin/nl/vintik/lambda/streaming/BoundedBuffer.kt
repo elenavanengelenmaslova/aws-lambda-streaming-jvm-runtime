@@ -26,6 +26,7 @@ public const val BUFFER_SIZE: Int = 1_048_576
  *   reach a different stream.
  * @return the total number of bytes copied
  */
+@JvmOverloads
 public fun copy(
     source: InputStream,
     sink: OutputStream,

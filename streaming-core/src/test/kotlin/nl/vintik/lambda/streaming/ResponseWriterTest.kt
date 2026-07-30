@@ -263,6 +263,25 @@ class ResponseWriterTest {
     }
 
     @Test
+    fun `Given a negative maxPreludeLen When a ResponseWriter is constructed Then it is rejected immediately`() {
+        // Given / When / Then — no prelude can be shorter than a negative limit, so such a writer
+        // could only ever throw. The mistake surfaces at construction, not per response.
+        assertThrows(IllegalArgumentException::class.java) {
+            ResponseWriter(json, maxPreludeLen = -1)
+        }
+    }
+
+    @Test
+    fun `Given a zero maxPreludeLen When a ResponseWriter is constructed Then it is accepted`() {
+        // Given — zero is a degenerate but well-defined limit: only an empty prelude would pass.
+        // When / Then — construction succeeds; the limit is enforced when writing, not here.
+        assertThrows(MetadataTooLargeException::class.java) {
+            ResponseWriter(json, maxPreludeLen = 0)
+                .writeMetadata(ByteArrayOutputStream(), ResponseMetadata(204, emptyMap()))
+        }
+    }
+
+    @Test
     fun `Given a header value containing a NUL character When writeMetadata is called Then the prelude carries no raw zero byte`() {
         // Given — AWS's reference implementation states a NUL byte is not allowed in the prelude,
         // since it would be indistinguishable from the delimiter. The JSON encoder escapes it.

@@ -47,11 +47,20 @@ public const val OBSERVED_MAX_PRELUDE_LEN: Int = 16_376
  * @param maxPreludeLen when non-null, a serialized prelude longer than this many bytes raises
  *   [MetadataTooLargeException] **before** anything is written, leaving the stream untouched and
  *   the status uncommitted. See [OBSERVED_MAX_PRELUDE_LEN]. Null (the default) imposes no limit.
+ * @throws IllegalArgumentException if [maxPreludeLen] is negative. No prelude can satisfy a
+ *   negative limit, so such a writer could only ever fail; rejecting it here surfaces the
+ *   mistake at construction rather than as a [MetadataTooLargeException] per response.
  */
 public class ResponseWriter(
     private val json: Json = Json,
     private val maxPreludeLen: Int? = null,
 ) {
+
+    init {
+        require(maxPreludeLen == null || maxPreludeLen >= 0) {
+            "maxPreludeLen must be non-negative or null, but was $maxPreludeLen"
+        }
+    }
 
     /**
      * Writes segments 1 + 2 of the protocol: the [metadata] JSON as UTF-8 bytes followed by a
@@ -83,6 +92,7 @@ public class ResponseWriter(
      * @throws MetadataTooLargeException if a `maxPreludeLen` was configured and the serialized
      *   prelude exceeds it. Nothing is written in that case.
      */
+    @JvmOverloads
     public fun writeResponse(
         output: OutputStream,
         metadata: ResponseMetadata,
