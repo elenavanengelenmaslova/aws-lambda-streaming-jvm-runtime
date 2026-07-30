@@ -167,4 +167,140 @@ class ResponseWriterTest {
             writer.writeError(FailingOutputStream(), 502, "retrieval failed")
         }
     }
+
+    @Test
+    fun `Given a body When writeResponse is called Then the body follows the delimiter byte for byte`() {
+        // Given
+        val metadata = ResponseMetadata(200, mapOf("Content-Type" to "text/plain"))
+        val body = "hello streaming world".toByteArray(Charsets.UTF_8)
+        val out = ByteArrayOutputStream()
+
+        // When
+        writer.writeResponse(out, metadata, body)
+
+        // Then
+        val bytes = out.toByteArray()
+        val delimiterStart = indexOfDelimiter(bytes)
+        assertEquals(
+            metadata,
+            json.decodeFromString<ResponseMetadata>(
+                String(bytes.copyOfRange(0, delimiterStart), Charsets.UTF_8),
+            ),
+        )
+        assertArrayEquals(body, bytes.copyOfRange(delimiterStart + DELIMITER_LEN, bytes.size))
+    }
+
+    @Test
+    fun `Given no body When writeResponse is called Then nothing follows the delimiter`() {
+        // Given
+        val out = ByteArrayOutputStream()
+
+        // When — a metadata-only response, e.g. 204.
+        writer.writeResponse(out, ResponseMetadata(204, emptyMap()))
+
+        // Then
+        val bytes = out.toByteArray()
+        assertEquals(indexOfDelimiter(bytes) + DELIMITER_LEN, bytes.size)
+    }
+
+    @Test
+    fun `Given no configured limit When the prelude is large Then it is written without complaint`() {
+        // Given — the default writer matches the AWS reference implementation, which validates
+        // nothing. A prelude far past any commonly cited budget must still be written.
+        val metadata = ResponseMetadata(200, mapOf("X-Big" to "v".repeat(OBSERVED_MAX_PRELUDE_LEN)))
+        val out = ByteArrayOutputStream()
+
+        // When
+        writer.writeMetadata(out, metadata)
+
+        // Then
+        assertTrue(out.toByteArray().size > OBSERVED_MAX_PRELUDE_LEN)
+    }
+
+    @Test
+    fun `Given a prelude exactly at the configured limit When writeMetadata is called Then it is written`() {
+        // Given — a limit set to the exact encoded length: the boundary is inclusive.
+        val metadata = ResponseMetadata(200, mapOf("Content-Type" to "text/plain"))
+        val exactLen = json.encodeToString(metadata).toByteArray(Charsets.UTF_8).size
+        val out = ByteArrayOutputStream()
+
+        // When
+        ResponseWriter(json, maxPreludeLen = exactLen).writeMetadata(out, metadata)
+
+        // Then
+        assertEquals(exactLen + DELIMITER_LEN, out.toByteArray().size)
+    }
+
+    @Test
+    fun `Given a prelude one byte over the configured limit When writeMetadata is called Then it throws and writes nothing`() {
+        // Given — one byte under the encoded length, so the prelude is oversized by exactly one.
+        val metadata = ResponseMetadata(200, mapOf("Content-Type" to "text/plain"))
+        val exactLen = json.encodeToString(metadata).toByteArray(Charsets.UTF_8).size
+        val out = ByteArrayOutputStream()
+
+        // When / Then
+        assertThrows(MetadataTooLargeException::class.java) {
+            ResponseWriter(json, maxPreludeLen = exactLen - 1).writeMetadata(out, metadata)
+        }
+
+        // The status is only committed once the delimiter is written, so an oversized prelude
+        // must leave the stream completely untouched — the caller can still write a 502 instead.
+        assertEquals(0, out.toByteArray().size, "no byte may be written when the prelude is rejected")
+    }
+
+    @Test
+    fun `Given a configured limit When writeResponse is called with an oversized prelude Then no body bytes are written either`() {
+        // Given
+        val metadata = ResponseMetadata(200, mapOf("X-Big" to "v".repeat(512)))
+        val out = ByteArrayOutputStream()
+
+        // When / Then — the guard runs before the prelude, so the body never reaches the stream.
+        assertThrows(MetadataTooLargeException::class.java) {
+            ResponseWriter(json, maxPreludeLen = 64)
+                .writeResponse(out, metadata, "body".toByteArray(Charsets.UTF_8))
+        }
+        assertEquals(0, out.toByteArray().size)
+    }
+
+    @Test
+    fun `Given a negative maxPreludeLen When a ResponseWriter is constructed Then it is rejected immediately`() {
+        // Given / When / Then — no prelude can be shorter than a negative limit, so such a writer
+        // could only ever throw. The mistake surfaces at construction, not per response.
+        assertThrows(IllegalArgumentException::class.java) {
+            ResponseWriter(json, maxPreludeLen = -1)
+        }
+    }
+
+    @Test
+    fun `Given a zero maxPreludeLen When a ResponseWriter is constructed Then it is accepted`() {
+        // Given — zero is a degenerate but well-defined limit: only an empty prelude would pass.
+        // When / Then — construction succeeds; the limit is enforced when writing, not here.
+        assertThrows(MetadataTooLargeException::class.java) {
+            ResponseWriter(json, maxPreludeLen = 0)
+                .writeMetadata(ByteArrayOutputStream(), ResponseMetadata(204, emptyMap()))
+        }
+    }
+
+    @Test
+    fun `Given a header value containing a NUL character When writeMetadata is called Then the prelude carries no raw zero byte`() {
+        // Given — AWS's reference implementation states a NUL byte is not allowed in the prelude,
+        // since it would be indistinguishable from the delimiter. The JSON encoder escapes it.
+        val nul = Char(0)
+        val metadata = ResponseMetadata(200, mapOf("X-Nul" to "a${nul}b"))
+        val out = ByteArrayOutputStream()
+
+        // When
+        writer.writeMetadata(out, metadata)
+
+        // Then — the delimiter is the first zero byte, so the prelude before it has none.
+        val bytes = out.toByteArray()
+        val delimiterStart = indexOfDelimiter(bytes)
+        val prelude = bytes.copyOfRange(0, delimiterStart)
+        assertTrue(
+            prelude.none { it == 0.toByte() },
+            "the encoded prelude must not contain a raw NUL byte",
+        )
+        // ...and the value still round-trips intact.
+        assertEquals(metadata, json.decodeFromString<ResponseMetadata>(String(prelude, Charsets.UTF_8)))
+    }
 }

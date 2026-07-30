@@ -7,4 +7,4 @@ import kotlinx.serialization.Serializable
  * No file bytes are written for error responses.
  */
 @Serializable
-data class ErrorBody(val message: String)
+public data class ErrorBody(public val message: String)
