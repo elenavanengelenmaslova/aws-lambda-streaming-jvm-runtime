@@ -9,6 +9,13 @@ build/
 *.iws
 out/
 
+# Eclipse / VS Code Java language server (jdt.ls) output
+bin/
+.classpath
+.project
+.settings/
+.factorypath
+
 # OS
 .DS_Store
 
