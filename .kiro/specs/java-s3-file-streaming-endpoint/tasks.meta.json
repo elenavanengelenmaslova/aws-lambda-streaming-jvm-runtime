@@ -1,0 +1,824 @@
+{
+  "pbtResults": {
+    "6.3 Write property test for byte-identical streaming": {
+      "status": "passed",
+      "lastRunTimestamp": 1785563767947
+    },
+    "6.4 Write property test for bounded transfer memory": {
+      "status": "passed",
+      "lastRunTimestamp": 1785564130164
+    },
+    "7.2 Write property test for file-name validation and zero S3 access on rejection": {
+      "status": "passed",
+      "lastRunTimestamp": 1785564465288
+    },
+    "7.3 Write property test for status-committed-once": {
+      "status": "passed",
+      "lastRunTimestamp": 1785564738475
+    }
+  },
+  "executionHistory": {
+    "1.1 Register the module and create its build file": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536547483
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536558575
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562002442
+      }
+    ],
+    "1.2 Checkpoint - run `./gradlew :streaming-s3-example-java:build -PexcludeTags=integration` and confirm the module configures, compiles, and the (empty) test task succeeds. Confirm `streaming-core` and `streaming-s3-example` still build. Ask the user if questions arise.": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536547591
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570093637
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570540108
+      }
+    ],
+    "2.1 Create the domain and outcome types (Java records + sealed interfaces)": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536547636
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562022217
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562924117
+      }
+    ],
+    "2.2 Checkpoint - run `./gradlew :streaming-s3-example-java:build -PexcludeTags=integration`. Ensure it builds, ask the user if questions arise.": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536547728
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570095024
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570541491
+      }
+    ],
+    "3.1 Write the metadata round-trip property test": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536547789
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562933585
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563491197
+      }
+    ],
+    "3.2 Checkpoint - run `./gradlew :streaming-s3-example-java:test -PexcludeTags=integration`. Ensure the property test passes; record any Java-interop friction in `docs/log.md` (Req 1.5, 14). Ask the user if questions arise.": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536547846
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570097005
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570543402
+      }
+    ],
+    "4.1 Implement `FileNameValidator.validate(String)`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536547880
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562934830
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563492611
+      }
+    ],
+    "4.2 Write unit tests for `FileNameValidator`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536547912
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563504514
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563839349
+      }
+    ],
+    "4.3 Checkpoint - run `./gradlew :streaming-s3-example-java:test -PexcludeTags=integration`. Ensure all tests pass, ask the user if questions arise.": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536547951
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570099312
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570545262
+      }
+    ],
+    "5.1 Implement `RequestParser.parse(InputStream)`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548003
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562936248
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563493980
+      }
+    ],
+    "5.2 Write unit tests for `RequestParser`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548104
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563505496
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563840753
+      }
+    ],
+    "5.3 Checkpoint - run `./gradlew :streaming-s3-example-java:test -PexcludeTags=integration`. Ensure all tests pass, ask the user if questions arise.": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548134
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570100208
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570546723
+      }
+    ],
+    "6.1 Implement `S3Source`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548170
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562937240
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563494978
+      }
+    ],
+    "6.2 Write unit tests for `S3Source`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548209
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563506884
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563842144
+      }
+    ],
+    "6.3 Write property test for byte-identical streaming": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548245
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563507919
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563843116
+      }
+    ],
+    "6.4 Write property test for bounded transfer memory": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548285
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563853382
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564151860
+      }
+    ],
+    "6.5 Checkpoint - run `./gradlew :streaming-s3-example-java:test -PexcludeTags=integration`. Ensure all tests pass, ask the user if questions arise.": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548345
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570102060
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570548645
+      }
+    ],
+    "7.1 Implement `StreamHandler` (`RequestStreamHandler`)": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548379
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563503170
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785563837951
+      }
+    ],
+    "7.2 Write property test for file-name validation and zero S3 access on rejection": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548411
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564159248
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564762429
+      }
+    ],
+    "7.3 Write property test for status-committed-once": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548446
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564159415
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564763744
+      }
+    ],
+    "7.4 Write branch unit tests for `StreamHandler`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548478
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564160428
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564765085
+      }
+    ],
+    "7.5 Checkpoint - run `./gradlew :streaming-s3-example-java:test -PexcludeTags=integration`. Ensure all tests pass, ask the user if questions arise.": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548515
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570103521
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570550076
+      }
+    ],
+    "8.1 Implement `Priming` (`org.crac.Resource`)": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548570
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564161821
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564766584
+      }
+    ],
+    "8.2 Write unit tests for `Priming`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548612
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564869438
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785565109510
+      }
+    ],
+    "8.3 Checkpoint - run `./gradlew :streaming-s3-example-java:test -PexcludeTags=integration`. Ensure all tests pass, ask the user if questions arise.": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548645
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570105375
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570551897
+      }
+    ],
+    "9.1 Write the sub-6 MB integration test": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548678
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564162959
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564767817
+      }
+    ],
+    "9.2 Write the ~15 MB Test_Object integration test": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548717
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564771077
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564865732
+      }
+    ],
+    "9.3 Checkpoint - run `./gradlew :streaming-s3-example-java:test` (with Colima running) and confirm unit + integration tests pass. Ask the user if questions arise.": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548783
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570566825
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785571118821
+      }
+    ],
+    "10.1 Create `deployment/aws/sam-java/template.yaml`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548833
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536559979
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562003344
+      }
+    ],
+    "10.2 Create `deployment/aws/sam-java/{samconfig.toml,build.sh,deploy.sh}`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548868
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562023585
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562925442
+      }
+    ],
+    "10.3 Checkpoint - run `sam validate --template-file deployment/aws/sam-java/template.yaml` and confirm exit code 0. Ask the user if questions arise.": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548945
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570106782
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570553417
+      }
+    ],
+    "11.1 Update `deployment/aws/oidc/github-oidc-role.yaml`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536548978
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536561530
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562004769
+      }
+    ],
+    "11.2 Checkpoint - validate the OIDC template (`aws cloudformation validate-template` or `cfn-lint`) and confirm it still parses; note that applying it requires re-running the OIDC bootstrap with account credentials. Ask the user if questions arise.": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536549018
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570108742
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570555050
+      }
+    ],
+    "12.1 Extend `workflow-build.yml` to build, cover, and validate the Java example": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536549077
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562025036
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562926732
+      }
+    ],
+    "12.2 Parameterize the reusable deploy and streaming-test workflows": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536549129
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562026128
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562927876
+      }
+    ],
+    "12.3 Add the Java stack to the entry-point pipelines via a stack matrix": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536549163
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564870721
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785565110522
+      }
+    ],
+    "12.4 Confirm the shared streaming test targets the Java stack": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536549195
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785564871805
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785565111851
+      }
+    ],
+    "13.1 Append Java-specific entries to `docs/log.md`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536549246
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536562516
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562006179
+      }
+    ],
+    "14.1 Run `./gradlew :streaming-s3-example-java:koverHtmlReport :streaming-s3-example-java:koverVerify`": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536549318
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785565126564
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570037267
+      }
+    ],
+    "15.1 Deploy the Java stack and prove streaming against the live endpoint": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536549369
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785571175706
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785572442224
+      }
+    ],
+    "15.2 Run the full post-deploy verification and teardown": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785536549409
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785572445201
+      },
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785573992205
+      }
+    ],
+    "13. Record development knowledge in the dev log": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785562006237
+      }
+    ],
+    "12. Wire the Java example into the CI/CD pipeline": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785565111945
+      }
+    ],
+    "14. Final coverage verification": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570037568
+      }
+    ],
+    "1. Set up the Java Gradle module and build configuration": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570540160
+      }
+    ],
+    "2. Implement the data models": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570541539
+      }
+    ],
+    "3. Verify the library's response protocol works from Java (Property 1)": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570543442
+      }
+    ],
+    "4. Implement the File_Name_Validator": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570545304
+      }
+    ],
+    "5. Implement the Request_Parser": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570546866
+      }
+    ],
+    "6. Implement the S3_Source (AWS SDK for Java v2) and bounded streaming": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570548759
+      }
+    ],
+    "7. Implement the Stream_Handler orchestration": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570550203
+      }
+    ],
+    "8. Implement the Priming_Hook (CRaC)": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570551955
+      }
+    ],
+    "10. Author the Java SAM infrastructure and deploy scripts": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570553477
+      }
+    ],
+    "11. Widen the OIDC role for the Java stack": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785570555094
+      }
+    ],
+    "9. Implement LocalStack integration tests": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785571118874
+      }
+    ],
+    "15. Real deploy and pipeline verification (requires AWS access)": [
+      {
+        "executionId": "a7e9a13b-ea2d-4933-8de1-4c23d3f37ff2",
+        "chatSessionId": "sess_81bc10b7-28ff-4601-af37-32e6be34f5bd",
+        "timestamp": 1785573992251
+      }
+    ]
+  }
+}

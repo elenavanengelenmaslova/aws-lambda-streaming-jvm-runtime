@@ -1,0 +1,34 @@
+# AWS SAM CLI configuration.
+# Drives `sam build` and `sam deploy` for the Java S3 file streaming endpoint.
+# Run from deployment/aws/sam-java/ (or pass --config-file to point here).
+version = 0.1
+
+[default.global.parameters]
+stack_name = "java-s3-file-streaming-endpoint"
+
+[default.build.parameters]
+# template.yaml lives alongside this config.
+template_file = "template.yaml"
+cached = true
+parallel = true
+
+[default.validate.parameters]
+template_file = "template.yaml"
+lint = false
+
+[default.deploy.parameters]
+stack_name = "java-s3-file-streaming-endpoint"
+# Required for the scoped Lambda execution role declared in the template.
+capabilities = "CAPABILITY_IAM"
+# arm64/Java 25 streaming Lambda - override per environment as needed.
+region = "eu-west-1"
+confirm_changeset = true
+# Use SAM's managed bucket for build/deploy artifacts (no standing cost).
+resolve_s3 = true
+disable_rollback = false
+
+[default.sync.parameters]
+watch = false
+
+[default.local_start_api.parameters]
+warm_containers = "EAGER"

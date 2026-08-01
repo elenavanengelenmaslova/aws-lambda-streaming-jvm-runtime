@@ -32,7 +32,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Run tests with coverage
-        run: ./gradlew :streaming-core:test :streaming-core:koverHtmlReport :streaming-core:koverVerify :streaming-s3-example:test -PexcludeTags=integration
+        run: ./gradlew :streaming-core:test :streaming-core:koverHtmlReport :streaming-core:koverVerify :streaming-s3-example:test :streaming-s3-example-java:test :streaming-s3-example-java:koverVerify -PexcludeTags=integration
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
@@ -54,3 +54,8 @@ jobs:
         env:
           AWS_DEFAULT_REGION: ${{ inputs.aws-region }}
         run: sam validate --template-file deployment/aws/sam/template.yaml --region ${{ inputs.aws-region }}
+
+      - name: Validate Java SAM template
+        env:
+          AWS_DEFAULT_REGION: ${{ inputs.aws-region }}
+        run: sam validate --template-file deployment/aws/sam-java/template.yaml --region ${{ inputs.aws-region }}

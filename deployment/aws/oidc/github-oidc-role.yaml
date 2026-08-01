@@ -139,7 +139,8 @@ Resources:
                     'iam:PassedToService': cloudformation.amazonaws.com
 
               # S3 permissions for the streaming test (seed object + verify).
-              # Scoped to the application bucket created by the SAM stack.
+              # Scoped to the application buckets created by the SAM stacks
+              # (Kotlin: s3-file-streaming-endpoint-*, Java: java-s3-file-streaming-endpoint-*).
               - Effect: Allow
                 Action:
                   - s3:PutObject
@@ -148,6 +149,8 @@ Resources:
                 Resource:
                   - 'arn:aws:s3:::s3-file-streaming-endpoint-*'
                   - 'arn:aws:s3:::s3-file-streaming-endpoint-*/*'
+                  - 'arn:aws:s3:::java-s3-file-streaming-endpoint-*'
+                  - 'arn:aws:s3:::java-s3-file-streaming-endpoint-*/*'
 
               # s3:HeadObject is covered by s3:GetObject, but explicit for clarity
               - Effect: Allow
@@ -155,6 +158,7 @@ Resources:
                   - s3:GetObject
                 Resource:
                   - 'arn:aws:s3:::s3-file-streaming-endpoint-*/*'
+                  - 'arn:aws:s3:::java-s3-file-streaming-endpoint-*/*'
 
               # CloudWatch Logs read for streaming test memory check
               - Effect: Allow
@@ -162,6 +166,7 @@ Resources:
                   - logs:FilterLogEvents
                 Resource:
                   - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/s3-file-streaming-endpoint*'
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/java-s3-file-streaming-endpoint*'
 
               # Read API key value for authenticated streaming tests
               - Effect: Allow

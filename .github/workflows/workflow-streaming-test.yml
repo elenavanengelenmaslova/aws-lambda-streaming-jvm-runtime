@@ -16,8 +16,18 @@ on:
       stack-name:
         required: false
         type: string
-        default: ''
-        description: 'CloudFormation stack name override'
+        default: 's3-file-streaming-endpoint'
+        description: 'CloudFormation stack name whose outputs the streaming test resolves'
+      test-script:
+        required: false
+        type: string
+        default: 'scripts/pipeline-streaming-test.sh'
+        description: 'Pipeline streaming-test script to run against the deployed stack'
+      test-object-key:
+        required: false
+        type: string
+        default: 'streaming-test-12mb.bin'
+        description: 'S3 object key the streaming test seeds and streams'
     secrets:
       AWS_ACCOUNT_ID:
         required: true
@@ -43,4 +53,6 @@ jobs:
         env:
           STACK_NAME: ${{ inputs.stack-name || 's3-file-streaming-endpoint' }}
           AWS_REGION: ${{ inputs.aws-region }}
-        run: ./scripts/pipeline-streaming-test.sh
+          TEST_OBJECT_KEY: ${{ inputs.test-object-key || 'streaming-test-12mb.bin' }}
+          TEST_SCRIPT: ${{ inputs.test-script || 'scripts/pipeline-streaming-test.sh' }}
+        run: ./"$TEST_SCRIPT"

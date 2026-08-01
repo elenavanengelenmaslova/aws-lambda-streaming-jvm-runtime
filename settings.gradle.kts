@@ -12,3 +12,4 @@ dependencyResolutionManagement {
 
 include("streaming-core")
 include("streaming-s3-example")
+include("streaming-s3-example-java")
