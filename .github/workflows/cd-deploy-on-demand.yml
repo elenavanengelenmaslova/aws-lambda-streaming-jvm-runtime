@@ -3,11 +3,6 @@ name: CD - Deploy On Demand
 on:
   workflow_dispatch:
     inputs:
-      stack-name:
-        description: 'CloudFormation stack name (leave empty to use default from samconfig.toml)'
-        required: false
-        default: ''
-        type: string
       aws-region:
         description: 'AWS region for deployment'
         required: false
@@ -29,21 +24,50 @@ jobs:
 
   deploy:
     needs: test
+    strategy:
+      # Deploy both example stacks. fail-fast disabled so one stack's failure
+      # does not cancel the other's deploy.
+      fail-fast: false
+      matrix:
+        include:
+          - sam-dir: deployment/aws/sam
+            stack-name: s3-file-streaming-endpoint
+            build-task: ':streaming-s3-example:build'
+            jar-name: streaming-endpoint.jar
+          - sam-dir: deployment/aws/sam-java
+            stack-name: java-s3-file-streaming-endpoint
+            build-task: ':streaming-s3-example-java:build'
+            jar-name: streaming-endpoint-java.jar
     uses: ./.github/workflows/workflow-deploy-aws.yml
     with:
       environment: default
       aws-region: ${{ inputs.aws-region }}
       github-actions-role-name: ${{ inputs.github-actions-role-name || vars.OIDC_ROLE_NAME }}
-      stack-name: ${{ inputs.stack-name }}
+      sam-dir: ${{ matrix.sam-dir }}
+      stack-name: ${{ matrix.stack-name }}
+      build-task: ${{ matrix.build-task }}
+      jar-name: ${{ matrix.jar-name }}
     secrets:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
 
   streaming-tests:
     needs: deploy
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - stack-name: s3-file-streaming-endpoint
+            test-script: scripts/pipeline-streaming-test.sh
+            test-object-key: streaming-test-12mb.bin
+          - stack-name: java-s3-file-streaming-endpoint
+            test-script: scripts/pipeline-streaming-test.sh
+            test-object-key: streaming-test-12mb-java.bin
     uses: ./.github/workflows/workflow-streaming-test.yml
     with:
       aws-region: ${{ inputs.aws-region }}
       github-actions-role-name: ${{ inputs.github-actions-role-name || vars.OIDC_ROLE_NAME }}
-      stack-name: ${{ inputs.stack-name }}
+      stack-name: ${{ matrix.stack-name }}
+      test-script: ${{ matrix.test-script }}
+      test-object-key: ${{ matrix.test-object-key }}
     secrets:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}

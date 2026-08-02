@@ -1,0 +1,38 @@
+{
+  "resource": "/{proxy+}",
+  "path": "/report.pdf",
+  "httpMethod": "GET",
+  "headers": {
+    "Accept": "*/*",
+    "Host": "abc123.execute-api.eu-west-1.amazonaws.com",
+    "User-Agent": "curl/8.4.0",
+    "X-Forwarded-Port": "443",
+    "X-Forwarded-Proto": "https"
+  },
+  "multiValueHeaders": {
+    "Accept": ["*/*"],
+    "Host": ["abc123.execute-api.eu-west-1.amazonaws.com"]
+  },
+  "queryStringParameters": null,
+  "multiValueQueryStringParameters": null,
+  "pathParameters": {
+    "proxy": "report.pdf"
+  },
+  "stageVariables": null,
+  "requestContext": {
+    "resourceId": "abcde",
+    "resourcePath": "/{proxy+}",
+    "httpMethod": "GET",
+    "path": "/prod/report.pdf",
+    "stage": "prod",
+    "requestId": "11111111-2222-3333-4444-555555555555",
+    "identity": {
+      "sourceIp": "203.0.113.7",
+      "userAgent": "curl/8.4.0"
+    },
+    "domainName": "abc123.execute-api.eu-west-1.amazonaws.com",
+    "apiId": "abc123"
+  },
+  "body": null,
+  "isBase64Encoded": false
+}

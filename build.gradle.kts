@@ -20,3 +20,10 @@ extra["junitVersion"] = "6.0.0"
 extra["mockkVersion"] = "1.14.5"
 extra["coroutinesVersion"] = "1.10.2"
 extra["testcontainersVersion"] = "1.21.4"
+
+// ---- Java example module (streaming-s3-example-java) ----------------------------------------
+// The Java example uses the AWS SDK for Java v2 (not the Kotlin SDK), Jackson for request parsing,
+// and Mockito for mocking — none of which the Kotlin module needs.
+extra["awsSdkJavaVersion"] = "2.50.2"
+extra["jacksonVersion"] = "2.22.1"
+extra["mockitoVersion"] = "5.23.0"

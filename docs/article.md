@@ -363,62 +363,66 @@ That is the test local code cannot replace.
 
 ## Using the library
 
-The streaming protocol and orchestration described in the steps above are available as a library:
+The wire protocol from Step 2 and the bounded-buffer streaming from Step 4 are published as `aws-lambda-streaming-core` [12]:
 
 ```kotlin
-implementation("nl.vintik:aws-lambda-streaming-core:<!-- VERSION -->")
+implementation("nl.vintik:aws-lambda-streaming-core:2.0.0")
 ```
 
-The library has no AWS SDK dependency. To use it, implement two interfaces.
+Its only dependency is `kotlinx-serialization-json`, for encoding the metadata prelude. There are no AWS artifacts — the module implements the wire format and never touches the Lambda or S3 APIs, so you bring your own `aws-lambda-java-core` for the `RequestStreamHandler` interface and whatever SDK you stream the source from. It is compiled for Java 21, so it runs on the `java21` and `java25` Lambda runtimes alike.
 
-**`KeyResolver`** — reads the incoming Lambda event and returns either a resolved resource key or an error status. This is where your event parsing and input validation live:
+The library gives you two pieces, mapping directly onto the two hard parts above:
 
-```kotlin
-class MyKeyResolver : KeyResolver {
-    override fun resolve(input: InputStream): KeyResult {
-        // parse the event, validate the key
-        return KeyResult.Resolved("my-resource-key")
-        // or: return KeyResult.Error(400, "The request was invalid.")
-    }
-}
-```
+- **`ResponseWriter`** — encodes the protocol from Step 2. It serializes a `ResponseMetadata` (status code, headers, optional cookies) and writes the eight null-byte delimiter before any body bytes. Once `writeMetadata` returns, the status is committed, so a later failure can only truncate the body, never rewrite the status (Step 5).
+- **`copy(source, sink)`** — the 1 MB bounded copy from Step 4, so a large body streams through a fixed buffer with per-chunk flush instead of being materialized in memory.
 
-**`StreamSource`** — confirms a resource exists and streams its bytes, for any backing store:
-
-```kotlin
-class DatabaseSource : StreamSource {
-    override suspend fun head(key: String): HeadResult {
-        // confirm the resource exists and return its size
-    }
-    override suspend fun streamBody(key: String, sink: OutputStream, flush: () -> Unit): Long {
-        // copy bytes to sink, calling flush() after each chunk
-    }
-}
-```
-
-Then wire both to `StreamHandler`, which is the `RequestStreamHandler` implementation:
+You still implement `RequestStreamHandler` yourself and drive these from it:
 
 ```kotlin
 class MyHandler : RequestStreamHandler {
-    private val handler = StreamHandler(
-        keyResolver = ::MyKeyResolver,
-        source = ::DatabaseSource,
-    )
+    private val writer = ResponseWriter()
 
-    override fun handleRequest(input: InputStream, output: OutputStream, context: Context) =
-        handler.handleRequest(input, output, context)
+    override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
+        output.use {
+            val request = parseRequest(input)              // your event parsing + validation
+            if (request == null) {
+                writer.writeError(output, 400, "The request could not be parsed.")
+                return@use
+            }
+
+            // validate the source before committing the status (Step 5)
+            request.openStream().use { source ->
+                writer.writeMetadata(output, ResponseMetadata(
+                    statusCode = 200,
+                    headers = mapOf(
+                        "Content-Type" to "application/octet-stream",
+                        "Content-Length" to request.contentLength.toString(),
+                    ),
+                ))
+                // status is committed — stream the body through the bounded buffer
+                copy(source, output)
+                output.flush()
+            }
+        }
+    }
 }
 ```
 
-`StreamHandler` owns the full pipeline — resolve key, head-before-commit, write metadata, stream body. `ResponseWriter` handles the metadata JSON and the eight null-byte delimiter; callers do not need to touch the wire format directly.
+The prelude models `headers` as name → single value, so for repeated headers `ResponseMetadata.fromMultiValue(status, headers)` collapses a `Map<String, List<String>>` — joining values with `", "` and routing `Set-Cookie` to the dedicated `cookies` array so cookies are never comma-corrupted. (The AWS format also allows a `multiValueHeaders` field, as noted in Step 2; the library deliberately does not model it, keeping the metadata to single-value `headers` plus `cookies`.) If you would rather fail fast than let an oversized prelude reach the runtime, construct the writer with `ResponseWriter(maxPreludeLen = OBSERVED_MAX_PRELUDE_LEN)`: it then raises `MetadataTooLargeException` before writing anything, while the status is still uncommitted.
 
-The companion repository [12] includes `S3Source` and `FileKeyResolver` as working examples. They are intentionally not part of the library itself — `S3Source` would pull the full AWS S3 Kotlin SDK onto every consumer, and `FileKeyResolver` is specific to the API Gateway `/{proxy+}` file-serving pattern — but both are short enough to copy into your own project and adapt.
+### Optional: the higher-level scaffolding in the example module
+
+The companion `streaming-s3-example` module [12] goes one step further and factors a handler into small, independently testable interfaces. These are *example* code, not part of the published artifact — deliberately so, since `S3Source` would drag the full AWS S3 Kotlin SDK onto every consumer — but they are short enough to copy and adapt:
+
+- **`RequestResolver<R>`** — reads the Lambda `InputStream` and returns either a typed request (`RequestResult.Resolved`) or an error status (`RequestResult.Error`). This is where event parsing and input validation live.
+- **`StreamSource<R>`** — `head(request)` confirms the resource exists and returns its size for `Content-Length`; `streamBody(request, sink, flush)` then copies the bytes. Any backing store can implement it.
+- **`StreamHandler<R>`** — the `RequestStreamHandler` that wires the two together and owns the ordering rules: resolve, head-before-commit, write metadata, stream body.
 
 ```kotlin
-// S3-backed handler using the companion example's S3Source and FileKeyResolver
+// S3-backed handler using the example module's FileKeyResolver + S3Source
 class S3Handler : RequestStreamHandler {
     private val handler = StreamHandler(
-        keyResolver = ::FileKeyResolver,
+        requestResolver = ::FileKeyResolver,
         source = ::S3Source,
     )
 
@@ -427,21 +431,19 @@ class S3Handler : RequestStreamHandler {
 }
 ```
 
+`FileKeyResolver` (proxy-path parsing plus file-name validation) and `S3Source` (`headObject` + `getObject` via the AWS S3 Kotlin SDK) live in the example module as working references.
+
 ## What changed in MockNest Serverless
 
-After implementing these mechanics I extracted the reusable parts into `aws-lambda-streaming-core` [12]. MockNest Serverless now uses the library directly — <!-- PLACEHOLDER: link to MockNest PR/commit when merged -->.
+Once the protocol was proven here, MockNest Serverless adopted the published library directly. Its AWS core module depends on `nl.vintik:aws-lambda-streaming-core:2.0.0`, and the streaming Lambda handler (`StreamingRuntimeLambdaHandler`) drives it:
 
-The parts that moved into the library were not specific to MockNest:
+* the metadata prelude and delimiter are written by `ResponseWriter`, constructed as `ResponseWriter(maxPreludeLen = OBSERVED_MAX_PRELUDE_LEN)` so an oversized prelude fails fast instead of reaching the runtime
+* response headers are built with `ResponseMetadata.fromMultiValue(...)`, so multi-value headers and `Set-Cookie` are collapsed correctly
+* the S3 body is copied to the output stream through the library's `copy(...)` bounded buffer inside `S3ResponseStreamer`
 
-* switch JVM handlers to `RequestStreamHandler`
-* parse the API Gateway request from `InputStream`
-* write the streaming response metadata and delimiter
-* stream the body through `OutputStream`
-* flush chunks for slow delivery
-* configure API Gateway/SAM for response streaming
-* test the protocol, the handler, and the deployed endpoint separately
+What stayed inside MockNest is what is specific to MockNest: the API Gateway request parser, the admin/client/health routing, and a chunked "dribble" writer that simulates slow, SSE-style delivery. The library covers the parts that are identical for any streaming JVM Lambda — encoding the wire protocol and copying the body with bounded memory — and leaves the application-specific pieces to the consumer.
 
-That is why I think the pattern is useful beyond this project. MockNest Serverless gave me the real use case, but the mechanics apply to any Java or Kotlin Lambda that needs to return larger or progressively delivered HTTP responses.
+That split is why the pattern is useful beyond this project. MockNest Serverless gave me the real use case, but the mechanics apply to any Java or Kotlin Lambda that needs to return larger or progressively delivered HTTP responses.
 
 ## Lessons learned
 
@@ -516,5 +518,5 @@ https://aws.amazon.com/about-aws/whats-new/2023/04/aws-lambda-response-payload-s
 [11] AWS What's New — AWS Lambda response streaming expands to all commercial AWS regions (April 7, 2026)
 https://aws.amazon.com/about-aws/whats-new/2026/04/aws-lambda-response-streaming/
 
-[12] aws-lambda-streaming-core — Maven Central / GitHub
-<!-- PLACEHOLDER: add Maven Central URL and GitHub link once published -->
+[12] aws-lambda-streaming-core — source, README, and the `streaming-s3-example` module (GitHub); published to Maven Central as `nl.vintik:aws-lambda-streaming-core`
+https://github.com/elenavanengelenmaslova/aws-lambda-streaming-jvm-runtime

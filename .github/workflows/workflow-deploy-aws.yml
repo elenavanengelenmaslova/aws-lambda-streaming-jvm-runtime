@@ -17,11 +17,26 @@ on:
         type: string
         default: 'StreamingExampleGitHubActionsRole'
         description: 'Name of the GitHub Actions OIDC role'
+      sam-dir:
+        required: false
+        type: string
+        default: 'deployment/aws/sam'
+        description: 'Directory holding the SAM template/config for the stack to deploy'
       stack-name:
         required: false
         type: string
-        default: ''
-        description: 'CloudFormation stack name override (defaults to value in samconfig.toml)'
+        default: 's3-file-streaming-endpoint'
+        description: 'CloudFormation stack name to deploy and to resolve outputs from'
+      build-task:
+        required: false
+        type: string
+        default: 'clean build'
+        description: 'Gradle task(s) that build the deployable fat jar'
+      jar-name:
+        required: false
+        type: string
+        default: 'streaming-endpoint.jar'
+        description: 'File name of the built fat jar under build/dist'
     secrets:
       AWS_ACCOUNT_ID:
         required: true
@@ -62,30 +77,37 @@ jobs:
         uses: aws-actions/setup-sam@v2
 
       - name: Build Lambda JAR
+        env:
+          BUILD_TASK: ${{ inputs.build-task }}
+          JAR_NAME: ${{ inputs.jar-name }}
         run: |
-          ./gradlew clean build --no-build-cache
+          # BUILD_TASK is intentionally unquoted so multi-task defaults (e.g. "clean build") word-split into separate Gradle tasks.
+          ./gradlew $BUILD_TASK --no-build-cache
           echo "Build completed, shadow JAR for deployment:"
-          ls -lh build/dist/streaming-endpoint.jar
+          ls -lh "build/dist/$JAR_NAME"
 
       - name: Deploy with SAM
         id: sam-deploy
+        env:
+          SAM_DIR: ${{ inputs.sam-dir }}
+          STACK_NAME_INPUT: ${{ inputs.stack-name }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_DEPLOY_REGION: ${{ inputs.aws-region }}
         run: |
-          cd deployment/aws/sam
-          echo "Starting SAM deployment..."
+          # Resolve the stack name; fall back to the Kotlin default when a caller passes an empty value.
+          STACK_NAME="${STACK_NAME_INPUT:-s3-file-streaming-endpoint}"
 
-          STACK_NAME_OVERRIDE="${{ inputs.stack-name }}"
+          cd "$SAM_DIR"
+          echo "Starting SAM deployment for stack: $STACK_NAME"
 
           # SAM deployment artifacts bucket (created by the bootstrap OIDC stack).
-          ARTIFACTS_BUCKET="streaming-sam-artifacts-${{ secrets.AWS_ACCOUNT_ID }}-${{ inputs.aws-region }}"
+          ARTIFACTS_BUCKET="streaming-sam-artifacts-${AWS_ACCOUNT_ID}-${AWS_DEPLOY_REGION}"
 
           # CloudFormation execution role (created by the bootstrap OIDC stack).
-          CFN_EXEC_ROLE_ARN="arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/StreamingCloudFormationExecutionRole"
+          CFN_EXEC_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/StreamingCloudFormationExecutionRole"
 
-          EXTRA_ARGS="--s3-bucket $ARTIFACTS_BUCKET --no-resolve-s3 --role-arn $CFN_EXEC_ROLE_ARN --parameter-overrides MemorySizeMb=1024 LogRetentionDays=7"
-
-          if [ -n "$STACK_NAME_OVERRIDE" ]; then
-            EXTRA_ARGS="$EXTRA_ARGS --stack-name $STACK_NAME_OVERRIDE"
-          fi
+          # Keep --parameter-overrides last so its multi-value list is terminated by end-of-args.
+          EXTRA_ARGS="--region $AWS_DEPLOY_REGION --s3-bucket $ARTIFACTS_BUCKET --no-resolve-s3 --role-arn $CFN_EXEC_ROLE_ARN --stack-name $STACK_NAME --parameter-overrides MemorySizeMb=1024 LogRetentionDays=7"
 
           DEPLOY_OUTPUT=$(sam deploy --config-env default --no-confirm-changeset --force-upload $EXTRA_ARGS 2>&1) && {
             echo "$DEPLOY_OUTPUT"
@@ -105,14 +127,11 @@ jobs:
 
       - name: Get deployment outputs
         id: outputs
+        env:
+          STACK_NAME_INPUT: ${{ inputs.stack-name }}
         run: |
-          STACK_NAME_OVERRIDE="${{ inputs.stack-name }}"
-
-          if [ -n "$STACK_NAME_OVERRIDE" ]; then
-            STACK_NAME="$STACK_NAME_OVERRIDE"
-          else
-            STACK_NAME="s3-file-streaming-endpoint"
-          fi
+          # Fall back to the Kotlin default when a caller passes an empty value.
+          STACK_NAME="${STACK_NAME_INPUT:-s3-file-streaming-endpoint}"
 
           echo "Resolved stack name: $STACK_NAME"
 

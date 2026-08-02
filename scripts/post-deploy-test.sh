@@ -24,6 +24,7 @@
 #   ENDPOINT_URL     Base HTTPS URL, trailing slash   (default: stack output StreamingEndpointUrl)
 #   BUCKET_NAME      Source S3 bucket                 (default: stack output SourceBucketName)
 #   FUNCTION_NAME    Lambda function name             (default: stack output FunctionName)
+#   API_KEY          API key value for x-api-key hdr   (default: resolved from stack output ApiKeyId)
 #   LARGE_FILE       >= 15 MB test object key         (default: test-object-15mb.bin)
 #   SMALL_FILE       ~6 MB baseline object key        (default: test-object-6mb.bin)
 #   LOG_WAIT_SECONDS Seconds to wait for CloudWatch    (default: 30)
@@ -73,6 +74,11 @@ region_args=()
 if [[ -n "$AWS_REGION" ]]; then
   region_args=(--region "$AWS_REGION")
 fi
+
+# curl header args carrying the API key when the endpoint requires one
+# (Auth ApiKeyRequired). Populated in resolve_config; the key is a runtime
+# secret — it is never printed and is masked in CI logs.
+auth_header_args=()
 
 # Scratch directory for downloaded bodies and reference copies; always cleaned up.
 WORK_DIR="$(mktemp -d)"
@@ -137,6 +143,25 @@ resolve_config() {
 
   # Endpoint must be HTTPS; the streaming endpoint serves over TLS only.
   [[ "$ENDPOINT_URL" == https://* ]] || fail "ENDPOINT_URL must be HTTPS: $ENDPOINT_URL"
+
+  # Resolve the API key when the endpoint enforces ApiKeyRequired. The key is a
+  # runtime secret: it is never echoed, and is masked in GitHub Actions logs.
+  if [[ -z "${API_KEY:-}" ]]; then
+    local api_key_id
+    api_key_id="$(stack_output ApiKeyId)"
+    if [[ -n "$api_key_id" && "$api_key_id" != "None" ]]; then
+      API_KEY="$(aws apigateway get-api-key \
+        --api-key "$api_key_id" --include-value "${region_args[@]}" \
+        --query 'value' --output text 2>/dev/null || true)"
+    fi
+  fi
+  if [[ -n "${API_KEY:-}" && "$API_KEY" != "None" ]]; then
+    auth_header_args=(--header "x-api-key: $API_KEY")
+    [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::add-mask::${API_KEY}"
+    info "resolved API key for authenticated requests (masked)"
+  else
+    info "no API key resolved; issuing unauthenticated requests"
+  fi
 
   LOG_GROUP="/aws/lambda/${FUNCTION_NAME}"
   info "resolved configuration for stack '$STACK_NAME' (endpoint, bucket, function)"
@@ -269,6 +294,7 @@ http_get_timed() {
   local metrics rc=0
 
   metrics="$(curl -sS --http1.1 \
+      "${auth_header_args[@]}" \
       -o "$body_file" \
       -w '%{http_code} %{time_starttransfer} %{time_total} %{size_download}' \
       "$url")" || rc=$?

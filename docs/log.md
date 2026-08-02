@@ -321,3 +321,239 @@ Each entry uses the form:
      that disappeared on retry.
 
   Both fixes are in `StreamHandler.handleRequest()` in `streaming-s3-example`.
+
+---
+
+## Consuming `aws-lambda-streaming-core` from Java — Kotlin-idiom interop friction
+
+- **Symptom / trigger:** The `streaming-s3-example-java` module drives the same
+  library the Kotlin example uses (`ResponseWriter`, `ResponseMetadata` +
+  `fromMultiValue`, and the top-level `copy(...)`), but from **plain Java**. The
+  library is Kotlin compiled for the JVM, and several Kotlin idioms that are
+  invisible from Kotlin surface as awkward call sites from Java. None are blockers,
+  but each needs a Java-compatible entry point (Req 1.5, 14):
+  - **Default constructor arguments don't exist for Java callers.** `ResponseWriter`
+    has a secondary constructor `ResponseWriter(json: Json = …, maxPreludeLen: Int? = …)`.
+    Java can't omit the defaults, so it must pass them explicitly:
+    `new ResponseWriter(Json.Default, ResponseWriterKt.OBSERVED_MAX_PRELUDE_LEN)`.
+    `Json.Default` is the companion singleton on `kotlinx.serialization.json.Json`.
+  - **Top-level `const`/`val` members live on a synthetic `*Kt` facade class.**
+    `OBSERVED_MAX_PRELUDE_LEN` and `DELIMITER_LEN` are file-level constants, so from
+    Java they are reached as `ResponseWriterKt.OBSERVED_MAX_PRELUDE_LEN` /
+    `ResponseWriterKt.DELIMITER_LEN`, not as members of `ResponseWriter`.
+  - **Companion functions are reached via `.Companion`.**
+    `ResponseMetadata.fromMultiValue(...)` is a companion-object function, so the
+    Java call site is `ResponseMetadata.Companion.fromMultiValue(status, headers)`
+    (there is no `@JvmStatic` on it).
+  - **A nullable-with-default parameter still has to be passed from Java.**
+    `ResponseMetadata(statusCode, headers, cookies = null)` — the `cookies` default
+    is unavailable to Java, so the direct constructor call must pass `null`
+    explicitly: `new ResponseMetadata(200, headers, null)`.
+  - **Function-typed parameters would force constructing a Kotlin `Function0`.**
+    The top-level `copy(source, sink, flush = { sink.flush() })` has a
+    function-typed third parameter. Thanks to `@JvmOverloads`, a 2-arg overload
+    `copy(InputStream, OutputStream)` is generated that defaults `flush` to flushing
+    the sink — exactly the desired behavior — so Java calls
+    `BoundedBufferKt.copy(in, out)` and avoids building a `kotlin.jvm.functions.Function0`.
+
+- **Resolution / status:** **Resolved by call-site convention (no library change
+  required to ship).** The Java handler consumes the library through these
+  Java-friendly entry points: `new ResponseWriter(Json.Default, ResponseWriterKt.OBSERVED_MAX_PRELUDE_LEN)`,
+  `new ResponseMetadata(int, Map, null)`, `ResponseMetadata.Companion.fromMultiValue(...)`,
+  and the 2-arg `BoundedBufferKt.copy(source, sink)`. These are verified against the
+  library's `.api` dump (`streaming-core/api/streaming-core.api`) and exercised by the
+  Property 1 metadata round-trip test; confirm the exact call sites compile and pass
+  at the task 3.2 checkpoint.
+  - **Candidate library ergonomics improvement (for the article / a future library
+    release):** add Java-friendly overloads so the `*Kt`/`Companion`/`Json.Default`
+    detours aren't needed — e.g. a `ResponseWriter(int maxPreludeLen)` overload
+    (and/or a no-`Json` overload defaulting to `Json.Default`), and optionally
+    `@JvmStatic` on `fromMultiValue`. These would make the library callable from Java
+    without any knowledge of Kotlin's compilation model. Recorded as a **candidate**,
+    not yet actioned — the current example deliberately calls the library as-published
+    to document the real Java consumption experience.
+
+---
+
+## Mockito on Java 25 — Byte Buddy class-file version (confirmed: flag NOT required)
+
+- **Symptom / trigger:** The Java example mocks its concrete collaborators
+  (`RequestParser`, `FileNameValidator`, `S3Source`, `ResponseWriter`, and the AWS SDK
+  for Java v2 `S3Client`) with **Mockito** instead of MockK. Mockito instruments
+  classes through **Byte Buddy**, the same engine that forced
+  `net.bytebuddy.experimental=true` for MockK on the Java 25 toolchain (see the MockK
+  entry above): older Byte Buddy builds refuse the Java 25 class-file version unless
+  experimental mode is enabled, which shows up as instrumentation/mock-creation
+  failures rather than a clear "unsupported class file" message.
+
+- **Resolution / status:** **Confirmed at the task-14.1 checkpoint — the experimental
+  flag is NOT required for the Java module.** With **Mockito 5.23.0** (`mockito-core` +
+  `mockito-junit-jupiter`), all 167 unit + property tests — including the ones that mock
+  concrete Java-25-compiled collaborators (`RequestParser`, `FileNameValidator`,
+  `S3Source`, `StreamHandler`, `ResponseWriter`) and the AWS SDK v2 `S3Client` interface —
+  pass on the Java 25 toolchain **without** `net.bytebuddy.experimental=true`. The Byte
+  Buddy bundled with Mockito 5.23.0 already recognises the JDK 25 class-file version, so
+  the pre-emptive `systemProperty("net.bytebuddy.experimental", "true")` was **dropped**
+  from the Java module's `tasks.test` (verified: the suite is green with the flag absent).
+  - **Contrast with the Kotlin/MockK module:** the Kotlin `streaming-core` module still
+    needs the flag (see the MockK entry above), because MockK 1.14.5 bundles an older Byte
+    Buddy that rejects the Java 25 class-file version. So the flag is a MockK-version
+    problem, not a JDK-25 problem per se — a newer Byte Buddy (as shipped in Mockito
+    5.23.0) removes the need for it entirely.
+
+---
+
+## Kover on a pure-Java module (confirmed: does NOT work — switched to JaCoCo)
+
+- **Symptom / trigger:** The repo standardizes on **Kover** (`koverVerify`) for the
+  coverage gate across modules. Kover instruments compiled JVM **bytecode**, so in
+  principle it should cover a Java-only module (`src/main/java`, no Kotlin production
+  sources) just as well as a Kotlin one. In practice it does **not**: with only the
+  `java` plugin applied (no `kotlin` plugin), running
+  `./gradlew :streaming-s3-example-java:koverHtmlReport :streaming-s3-example-java:koverVerify`
+  produced an HTML report reading **"No coverage information was found"** and a
+  `koverVerify` that **passed vacuously** — i.e. the 80% gate was green while measuring
+  *zero* code. A `--dry-run` of the report task told the whole story: for the Kotlin
+  module (`streaming-core`) Kover's graph includes `koverFindJar`, `test`, and
+  `koverGenerateArtifactJvm`; for the pure-Java module the graph is only
+  `koverGenerateArtifact` + `koverHtmlReport` — **no `test` task and no `…Jvm`
+  variant**. Kover creates its JVM coverage variant (the thing that instruments the
+  `test` task) only for a *Kotlin JVM module* — one where a Kotlin plugin is applied —
+  as the [Kover docs](https://kotlin.github.io/kotlinx-kover/gradle-plugin/) spell out
+  ("for Kotlin JVM module Kover creates special report variant with name jvm").
+  Switching the engine via `kover { useJacoco() }` did not help — the report then
+  rendered in JaCoCo's HTML style but still said **"No class files specified"**, because
+  the missing piece is the *variant/`test`-task wiring*, not the coverage engine.
+  (Content was rephrased for compliance with licensing restrictions.)
+
+- **Resolution / status:** **Confirmed at the task-14.1 checkpoint — Kover cannot
+  instrument this pure-Java module, so it was switched to JaCoCo (Req 14, per the
+  design's fallback note).** The module's `build.gradle.kts` now applies the core
+  `jacoco` plugin instead of `org.jetbrains.kotlinx.kover`:
+  - `jacoco { toolVersion = "0.8.14" }` — **JaCoCo 0.8.14 is the first release that
+    officially supports Java 25 class files** (0.8.13 was experimental), so the Java 25
+    toolchain's bytecode instruments cleanly. (Ref: JaCoCo change history, 0.8.14 —
+    "JaCoCo now officially supports Java 25".)
+  - `jacocoTestCoverageVerification` enforces the **same 80% gate** on the LINE counter
+    (`COVEREDRATIO`, `minimum = 0.80`) — the counter Kover's default `minValue` bound
+    used, so the gate is equivalent, not weakened.
+  - `jacocoTestReport` generates the HTML (and XML) report.
+  - The repo-wide command surface is preserved: thin **`koverHtmlReport` / `koverVerify`
+    alias tasks** delegate to the JaCoCo tasks, so the task-14.1 command and CI
+    (`workflow-build.yml` runs `:streaming-s3-example-java:koverVerify`) keep working
+    unchanged — no edits to the pipeline were needed.
+  - **Proof the gate is real (not vacuous like Kover's):** measured **line coverage
+    83.53% (142/170)** — report renders full per-class data — so `koverVerify` passes;
+    temporarily raising `minimum` to `0.95` made it **fail** with
+    `lines covered ratio is 0.83, but expected minimum is 0.95`, then reverted to `0.80`.
+  - **Takeaway for the article:** Kover's "it's just bytecode, so it covers Java too"
+    promise holds only when a Kotlin plugin is present to register the JVM variant. For a
+    genuinely Java-only Gradle module, reach for JaCoCo directly (and pin ≥ 0.8.14 on
+    Java 25). If a uniform `koverVerify` command surface matters across a mixed repo,
+    alias it to the JaCoCo tasks as done here.
+
+---
+
+## `sam build` fails on a prebuilt `java25` fat jar — deploy the CodeUri jar directly
+
+- **Symptom / trigger:** Running the local `deployment/aws/sam-java/deploy.sh` (which
+  did `build.sh` → `sam build` → `sam deploy`) failed at the `sam build` step against
+  the deployed SAM CLI (1.160.x):
+  ```
+  Build Failed
+  Error: Unable to find a supported build workflow for runtime 'java25'.
+  Reason: None of the supported manifests '['build.gradle', 'build.gradle.kts', 'pom.xml']'
+  were found in the following paths '[.../build/dist/streaming-endpoint-java.jar', '.../deployment/aws/sam-java']'
+  ```
+  The template's `CodeUri` already points at a **prebuilt fat jar**
+  (`build/dist/streaming-endpoint-java.jar`) produced by Gradle/Shadow. Recent SAM CLI
+  versions register a build workflow for the `java25` runtime that expects a
+  Gradle/Maven **manifest** in the `CodeUri` path; pointed at a bare `.jar` (which has
+  no manifest) that workflow errors out instead of treating the jar as already built.
+  The Kotlin `deployment/aws/sam/deploy.sh` carries the same `sam build` step and hits
+  the same trap on this SAM version.
+
+- **Root cause:** `sam build` is the wrong tool for an already-assembled fat jar. The
+  proven-working path — the CI pipeline `workflow-deploy-aws.yml` — never runs
+  `sam build`: it builds the jar with Gradle, then runs `sam deploy` directly, which
+  performs an implicit `sam package` (uploads the `CodeUri` jar to the artifacts bucket
+  and rewrites the template). `sam build` only makes sense when SAM itself compiles the
+  source, which is not how this repo produces the Lambda artifact.
+
+- **Resolution / status:** **Resolved.** Dropped the `sam build` step from
+  `deployment/aws/sam-java/deploy.sh`; it now runs `build.sh` (Gradle fat jar) then
+  `sam deploy --config-file samconfig.toml --template-file template.yaml`, packaging the
+  prebuilt jar directly — exactly what the pipeline does. With this, the Java stack
+  deployed cleanly to `<AWS_REGION>` (SnapStart `live` alias published) and the pipeline
+  streaming test passed against the live endpoint: a 12 MB (> 6 MB) payload delivered in
+  full and byte-identical, TTFB ≈ 46% of total over HTTP/1.1 (progressive delivery
+  confirmed). If a stale `.aws-sam/` build dir exists from a failed `sam build`, remove it
+  so `sam deploy` uses the source `template.yaml` rather than a broken build artifact.
+  - **Note:** the Kotlin `deployment/aws/sam/deploy.sh` still has the old `sam build`
+    step and would hit the same error on this SAM version; apply the same fix there when
+    it is next deployed locally (the CI pipeline is unaffected since it deploys directly).
+
+---
+
+## `post-deploy-test.sh` didn't send the API key — 403 at the warmup against an ApiKeyRequired endpoint
+
+- **Symptom / trigger:** Running `STACK_NAME=java-s3-file-streaming-endpoint scripts/post-deploy-test.sh`
+  against the deployed Java stack failed immediately: the endpoint enforces
+  `Auth: ApiKeyRequired: true` (both the Kotlin and Java SAM templates do), so an
+  unauthenticated GET returns **HTTP 403**. `post-deploy-test.sh` — unlike
+  `pipeline-streaming-test.sh` — never resolved or sent an `x-api-key` header, so
+  its very first request (the warmup) tripped the script's own non-success guard
+  (`non-success HTTP status 403 for warmup`) before any timing/memory check ran.
+  A bare `curl` to the endpoint confirms it: `no-key http_code=403`, whereas the
+  same request with a valid `x-api-key` header is accepted.
+
+- **Resolution / status:** **Resolved.** Brought `post-deploy-test.sh` in line with
+  `pipeline-streaming-test.sh`: `resolve_config` now resolves the API key from the
+  stack's `ApiKeyId` output via `aws apigateway get-api-key --include-value` (unless
+  `API_KEY` is already set), builds an `auth_header_args=(--header "x-api-key: …")`
+  array, and every `curl` in `http_get_timed` sends it. The key is treated as a
+  **runtime secret**: it is never echoed, and it is masked in GitHub Actions logs
+  with `::add-mask::`. When no `ApiKeyId` output exists the script falls back to
+  unauthenticated requests, so it still works against a keyless endpoint.
+  - **Takeaway for the article:** the two verification scripts are near-twins, but
+    only the pipeline one had learned the API-key lesson. When a template turns on
+    `ApiKeyRequired`, every client path — including the local post-deploy prover —
+    has to send `x-api-key`, or it fails at 403 long before it can measure anything.
+
+---
+
+## Missing S3 object returns **403**, not `NoSuchKey` — `s3:GetObject`-only IAM makes the not-found path respond 502
+
+- **Symptom / trigger:** With a valid API key, requesting a **non-existent** object
+  from the deployed Java endpoint consistently returned **HTTP 502** (fast, ~0.13 s —
+  not a cold start), where Req 4.2 expects **404**. CloudWatch shows the handler took
+  the `Failure` branch, not `NotFound`:
+  ```
+  WARN nl.vintik.streaming.java.StreamHandler - Object head failed or timed out; responding 502
+  software.amazon.awssdk.services.s3.model.S3Exception: Forbidden (Service: S3, Status Code: 403 ...)
+      at nl.vintik.streaming.java.S3Source.head(S3Source.java:76)
+  ```
+
+- **Root cause:** The Lambda's execution role grants **`s3:GetObject` only**, scoped
+  to `<BUCKET_ARN>/*`, with **no `s3:ListBucket`**. S3 returns `NoSuchKey` (404) for a
+  missing key only when the caller has `s3:ListBucket` on the bucket; **without**
+  `ListBucket`, S3 deliberately returns **`403 Forbidden`** for a missing key (so it
+  can't be used to probe object existence). `HeadObject` therefore surfaces a generic
+  `S3Exception` (status 403), not `NoSuchKeyException`. `S3Source.head` catches only
+  `NoSuchKeyException` → `NotFound`; every other exception → `Failure`, which the
+  handler maps to **502**. So a genuinely missing object is reported as an upstream
+  failure (502) instead of not-found (404).
+
+- **Resolution / status:** **RESOLVED.** Fixed in `S3Source.head()` by adding a catch
+  block for `S3Exception` (between the existing `NoSuchKeyException` and
+  `ApiCallTimeoutException` catches) that maps HTTP status codes 403 and 404 to
+  `HeadResult.NotFound`. This keeps the IAM policy `s3:GetObject`-only (no
+  `s3:ListBucket` needed) and makes the handler correctly return **404** for a missing
+  object regardless of whether S3 responds with 403 (no `ListBucket`) or 404 (has
+  `ListBucket`). A corresponding unit test (`headForbiddenOnMissingObjectMapsToNotFound`)
+  confirms the mapping. The Kotlin SDK handles this internally (maps both to `NotFound`),
+  so only the Java module required this fix.
+  - **Takeaway for the article:** "object not found ⇒ 404" is an IAM-shaped assumption.
+    On an S3 `GetObject`-only role, *missing* and *forbidden* are indistinguishable —
+    S3 returns 403 for both — so a not-found handler that keys off `NoSuchKey` alone
+    will mis-report missing objects as 5xx.

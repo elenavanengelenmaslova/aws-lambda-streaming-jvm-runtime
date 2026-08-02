@@ -20,7 +20,7 @@ The library handles:
 ## Dependency
 
 ```kotlin
-implementation("nl.vintik:aws-lambda-streaming-core:2.0.0")
+implementation("nl.vintik:aws-lambda-streaming-core:2.1.0")
 ```
 
 **One dependency:** `kotlinx-serialization-json`, for metadata encoding. No AWS artifacts — this module implements the wire protocol and never touches the Lambda or S3 APIs, so you bring your own `aws-lambda-java-core` for the `RequestStreamHandler` interface. No logging framework either: every failure propagates to your code, which has the request context needed to log it usefully.
@@ -29,7 +29,9 @@ Compiled for **Java 21**, so it runs on the `java21` and `java25` Lambda runtime
 
 ## Usage
 
-Implement `RequestStreamHandler` and use `ResponseWriter` to write the protocol:
+Implement `RequestStreamHandler` and use `ResponseWriter` to write the streaming protocol. The pattern is: resolve the streaming source (your logic), then let the library handle the wire format.
+
+**Kotlin**
 
 ```kotlin
 class MyHandler : RequestStreamHandler {
@@ -37,30 +39,62 @@ class MyHandler : RequestStreamHandler {
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
         output.use {
-            // --- parse and validate ---
-            val request = parseRequest(input)  // returns null on invalid input
-            if (request == null) {
-                writer.writeError(output, 400, "The request could not be parsed.")
+            // Your logic: parse the event, validate, confirm the source exists
+            val source = resolveSource(input) ?: run {
+                writer.writeError(output, 400, "Bad request.")
                 return@use
             }
 
-            // --- success: write metadata, then stream body ---
-            val contentLength: Long = request.contentLength
-            val sourceStream: InputStream = request.openStream()
-            writer.writeMetadata(output, ResponseMetadata(
-                statusCode = 200,
-                headers = mapOf(
-                    "Content-Type" to "application/octet-stream",
-                    "Content-Length" to contentLength.toString(),
-                ),
-            ))
-            // status is now committed — stream body bytes
-            copy(sourceStream, output)
-            output.flush()
+            // Stream it — the library handles the wire protocol
+            source.openBody().use { body ->
+                writer.writeMetadata(output, ResponseMetadata(
+                    statusCode = 200,
+                    headers = mapOf(
+                        "Content-Type" to "application/octet-stream",
+                        "Content-Length" to source.size.toString(),
+                    ),
+                ))
+                copy(body, output)
+                output.flush()
+            }
         }
     }
 }
 ```
+
+**Java**
+
+```java
+public class MyHandler implements RequestStreamHandler {
+    private final ResponseWriter writer = new ResponseWriter();
+
+    @Override
+    public void handleRequest(InputStream input, OutputStream output, Context context)
+            throws IOException {
+        try (output) {
+            // Your logic: parse the event, validate, confirm the source exists
+            var source = resolveSource(input);
+            if (source == null) {
+                writer.writeError(output, 400, "Bad request.");
+                return;
+            }
+
+            // Stream it — the library handles the wire protocol
+            try (var body = source.openBody()) {
+                writer.writeMetadata(output, new ResponseMetadata(
+                    200,
+                    Map.of("Content-Type", "application/octet-stream",
+                           "Content-Length", String.valueOf(source.size())),
+                    null));
+                BoundedBufferKt.copy(body, output);
+                output.flush();
+            }
+        }
+    }
+}
+```
+
+`resolveSource(input)` is your code — it parses the API Gateway event, validates the request, confirms the source exists (e.g. S3 `headObject`), and returns something with a `size` and an `openBody()` that gives you an `InputStream`. The library takes over from `writeMetadata` onwards.
 
 `ResponseWriter` owns the wire encoding. Once `writeMetadata` returns, the status is committed — a later failure can only truncate the body, never rewrite the status.
 
@@ -92,11 +126,14 @@ val writer = ResponseWriter(maxPreludeLen = OBSERVED_MAX_PRELUDE_LEN)
 
 An oversized prelude then raises `MetadataTooLargeException` **before anything is written**, so the stream is untouched and the status is still uncommitted — you can write a different response instead. Note that `OBSERVED_MAX_PRELUDE_LEN` (16376) is not an AWS-documented limit; it is the commonly cited 16 KiB budget less the delimiter. A negative `maxPreludeLen` is rejected by the constructor with `IllegalArgumentException`, since no prelude could ever satisfy it.
 
-## S3 example
+## Example modules
 
-The companion module `streaming-s3-example` is a complete AWS Lambda deployment that streams files from S3. It demonstrates one way to build a full handler on top of this library, including request parsing, validation, a `head`-before-commit existence check, and streaming via the AWS S3 Kotlin SDK.
+| Module | Language | Description |
+|--------|----------|-------------|
+| [`streaming-s3-example`](streaming-s3-example/) | Kotlin | Streams S3 files via the Kotlin AWS SDK (coroutines) |
+| [`streaming-s3-example-java`](streaming-s3-example-java/) | Java | Same functionality using AWS SDK for Java v2 (sync) — proves the library is consumable from plain Java |
 
-See the `streaming-s3-example` source for `FileKeyResolver`, `FileRequest`, `S3Source`, and `StreamHandler` as reference implementations.
+Both are complete Lambda deployments with SAM templates, SnapStart + CRaC priming, property-based tests, and LocalStack integration tests. They implement the `resolveSource` pattern shown above: parse → validate → head (confirm existence + get size) → stream body through the library's bounded buffer.
 
 ## License
 
