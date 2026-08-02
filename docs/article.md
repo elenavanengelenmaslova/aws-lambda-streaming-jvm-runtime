@@ -391,17 +391,18 @@ class MyHandler : RequestStreamHandler {
             }
 
             // validate the source before committing the status (Step 5)
-            val source: InputStream = request.openStream()
-            writer.writeMetadata(output, ResponseMetadata(
-                statusCode = 200,
-                headers = mapOf(
-                    "Content-Type" to "application/octet-stream",
-                    "Content-Length" to request.contentLength.toString(),
-                ),
-            ))
-            // status is committed — stream the body through the bounded buffer
-            copy(source, output)
-            output.flush()
+            request.openStream().use { source ->
+                writer.writeMetadata(output, ResponseMetadata(
+                    statusCode = 200,
+                    headers = mapOf(
+                        "Content-Type" to "application/octet-stream",
+                        "Content-Length" to request.contentLength.toString(),
+                    ),
+                ))
+                // status is committed — stream the body through the bounded buffer
+                copy(source, output)
+                output.flush()
+            }
         }
     }
 }

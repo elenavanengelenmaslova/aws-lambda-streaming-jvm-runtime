@@ -53,9 +53,9 @@ jobs:
       - name: Validate SAM template
         env:
           AWS_DEFAULT_REGION: ${{ inputs.aws-region }}
-        run: sam validate --template-file deployment/aws/sam/template.yaml --region ${{ inputs.aws-region }}
+        run: sam validate --template-file deployment/aws/sam/template.yaml --region $AWS_DEFAULT_REGION
 
       - name: Validate Java SAM template
         env:
           AWS_DEFAULT_REGION: ${{ inputs.aws-region }}
-        run: sam validate --template-file deployment/aws/sam-java/template.yaml --region ${{ inputs.aws-region }}
+        run: sam validate --template-file deployment/aws/sam-java/template.yaml --region $AWS_DEFAULT_REGION

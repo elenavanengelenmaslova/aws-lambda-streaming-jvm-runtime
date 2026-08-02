@@ -107,7 +107,7 @@ jobs:
           CFN_EXEC_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/StreamingCloudFormationExecutionRole"
 
           # Keep --parameter-overrides last so its multi-value list is terminated by end-of-args.
-          EXTRA_ARGS="--s3-bucket $ARTIFACTS_BUCKET --no-resolve-s3 --role-arn $CFN_EXEC_ROLE_ARN --stack-name $STACK_NAME --parameter-overrides MemorySizeMb=1024 LogRetentionDays=7"
+          EXTRA_ARGS="--region $AWS_DEPLOY_REGION --s3-bucket $ARTIFACTS_BUCKET --no-resolve-s3 --role-arn $CFN_EXEC_ROLE_ARN --stack-name $STACK_NAME --parameter-overrides MemorySizeMb=1024 LogRetentionDays=7"
 
           DEPLOY_OUTPUT=$(sam deploy --config-env default --no-confirm-changeset --force-upload $EXTRA_ARGS 2>&1) && {
             echo "$DEPLOY_OUTPUT"

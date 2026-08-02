@@ -141,6 +141,7 @@ Resources:
               # S3 permissions for the streaming test (seed object + verify).
               # Scoped to the application buckets created by the SAM stacks
               # (Kotlin: s3-file-streaming-endpoint-*, Java: java-s3-file-streaming-endpoint-*).
+              # Note: s3:HeadObject is covered by s3:GetObject (no separate action needed).
               - Effect: Allow
                 Action:
                   - s3:PutObject
@@ -150,14 +151,6 @@ Resources:
                   - 'arn:aws:s3:::s3-file-streaming-endpoint-*'
                   - 'arn:aws:s3:::s3-file-streaming-endpoint-*/*'
                   - 'arn:aws:s3:::java-s3-file-streaming-endpoint-*'
-                  - 'arn:aws:s3:::java-s3-file-streaming-endpoint-*/*'
-
-              # s3:HeadObject is covered by s3:GetObject, but explicit for clarity
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                Resource:
-                  - 'arn:aws:s3:::s3-file-streaming-endpoint-*/*'
                   - 'arn:aws:s3:::java-s3-file-streaming-endpoint-*/*'
 
               # CloudWatch Logs read for streaming test memory check

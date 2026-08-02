@@ -50,6 +50,10 @@ public final class StreamHandler implements RequestStreamHandler {
     /** Body content type declared for a successful stream (Req 4.3). */
     private static final String OCTET_STREAM = "application/octet-stream";
 
+    /** Eagerly instantiate Priming so it registers with CRaC during class init (SnapStart). */
+    @SuppressWarnings("unused")
+    private static final Priming PRIMING = new Priming();
+
     private final RequestParser parser;
     private final FileNameValidator validator;
     private final S3Source source;

@@ -186,10 +186,10 @@ class StatusCommittedOncePropertyTest {
 
     /**
      * 18 deterministic injection points across the three families (within the 10&ndash;20 range):
-     * seven pre-commit error mappings (three parse errors, five validation rejections — one per
-     * rejection family — a NotFound, and two head failures), three pre-commit write failures (mid-200
-     * prelude, mid-delimiter, and mid-404-error prelude), and three post-commit failures (source throws
-     * immediately, source writes a partial body then throws, and a sink that fails mid-body).
+     * twelve pre-commit error mappings (three parse errors, six validation rejections, a NotFound,
+     * and two head failures), three pre-commit write failures (mid-200 prelude, mid-delimiter, and
+     * mid-404-error prelude), and three post-commit failures (source throws immediately, source
+     * writes a partial body then throws, and a sink that fails mid-body).
      */
     static Stream<Arguments> scenarios() {
         return Stream.of(
